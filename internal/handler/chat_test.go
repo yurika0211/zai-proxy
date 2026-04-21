@@ -647,3 +647,66 @@ func TestNonStreamResponse_NoDeltaField(t *testing.T) {
 		t.Error("non-streaming response should not contain delta field")
 	}
 }
+
+// TestMarshalChunk_Success tests successful marshaling
+func TestMarshalChunk_Success(t *testing.T) {
+	chunk := model.ChatCompletionChunk{
+		ID:      "test-id",
+		Object:  "chat.completion.chunk",
+		Created: 1234567890,
+		Model:   "glm-4",
+	}
+
+	data := marshalChunk(chunk)
+	if data == nil {
+		t.Error("expected non-nil data for valid chunk")
+	}
+
+	var result model.ChatCompletionChunk
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Errorf("failed to unmarshal result: %v", err)
+	}
+	if result.ID != "test-id" {
+		t.Errorf("expected test-id, got %s", result.ID)
+	}
+}
+
+// TestMarshalChunk_NilInput tests with nil input
+func TestMarshalChunk_NilInput(t *testing.T) {
+	data := marshalChunk(nil)
+	if data == nil {
+		t.Error("expected non-nil data for nil input (marshals to 'null')")
+	}
+}
+
+// TestTruncate_ShortString tests truncate with short string
+func TestTruncate_ShortString(t *testing.T) {
+	result := truncate("hello", 10)
+	if result != "hello" {
+		t.Errorf("expected 'hello', got %q", result)
+	}
+}
+
+// TestTruncate_ExactLength tests truncate with exact length
+func TestTruncate_ExactLength(t *testing.T) {
+	result := truncate("hello", 5)
+	if result != "hello" {
+		t.Errorf("expected 'hello', got %q", result)
+	}
+}
+
+// TestTruncate_LongString tests truncate with long string
+func TestTruncate_LongString(t *testing.T) {
+	result := truncate("hello world", 5)
+	if result != "hello..." {
+		t.Errorf("expected 'hello...', got %q", result)
+	}
+}
+
+// TestTruncate_EmptyString tests truncate with empty string
+func TestTruncate_EmptyString(t *testing.T) {
+	result := truncate("", 10)
+	if result != "" {
+		t.Errorf("expected empty string, got %q", result)
+	}
+}
