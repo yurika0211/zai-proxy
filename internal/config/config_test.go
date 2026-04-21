@@ -30,19 +30,20 @@ func TestLoadConfig_MissingDefaultFileFallsBackToDefaults(t *testing.T) {
 		t.Fatalf("LoadConfig returned error: %v", err)
 	}
 
-	if Cfg.Listen != ":8000" {
-		t.Fatalf("expected default listen :8000, got %q", Cfg.Listen)
+	cfg := GetConfig()
+	if cfg.Listen != ":8000" {
+		t.Fatalf("expected default listen :8000, got %q", cfg.Listen)
 	}
-	if Cfg.LogLevel != "info" {
-		t.Fatalf("expected default log level info, got %q", Cfg.LogLevel)
+	if cfg.LogLevel != "info" {
+		t.Fatalf("expected default log level info, got %q", cfg.LogLevel)
 	}
-	if !Cfg.EnableStatusPage {
+	if !cfg.EnableStatusPage {
 		t.Fatalf("expected status page enabled by default")
 	}
-	if !Cfg.EnableExecCommand {
+	if !cfg.EnableExecCommand {
 		t.Fatalf("expected exec command enabled by default")
 	}
-	if len(Cfg.ExecCommandAllowlist) == 0 {
+	if len(cfg.ExecCommandAllowlist) == 0 {
 		t.Fatalf("expected non-empty exec command allowlist")
 	}
 }
@@ -91,43 +92,44 @@ exec-command-allow-background: false
 		t.Fatalf("LoadConfig returned error: %v", err)
 	}
 
-	if Cfg.Listen != ":9100" {
-		t.Fatalf("expected env port override, got %q", Cfg.Listen)
+	cfg := GetConfig()
+	if cfg.Listen != ":9100" {
+		t.Fatalf("expected env port override, got %q", cfg.Listen)
 	}
-	if Cfg.LogLevel != "debug" {
-		t.Fatalf("expected env log level override, got %q", Cfg.LogLevel)
+	if cfg.LogLevel != "debug" {
+		t.Fatalf("expected env log level override, got %q", cfg.LogLevel)
 	}
-	if !Cfg.EnableCORS {
+	if !cfg.EnableCORS {
 		t.Fatalf("expected env enable-cors override to win")
 	}
-	if !Cfg.EnableStatusPage {
+	if !cfg.EnableStatusPage {
 		t.Fatalf("expected env enable-status-page override to win")
 	}
-	if Cfg.ReadHeaderTimeoutSec != 9 {
-		t.Fatalf("expected env read-header-timeout override, got %d", Cfg.ReadHeaderTimeoutSec)
+	if cfg.ReadHeaderTimeoutSec != 9 {
+		t.Fatalf("expected env read-header-timeout override, got %d", cfg.ReadHeaderTimeoutSec)
 	}
-	if Cfg.ShutdownTimeoutSec != 11 {
-		t.Fatalf("expected env shutdown-timeout override, got %d", Cfg.ShutdownTimeoutSec)
+	if cfg.ShutdownTimeoutSec != 11 {
+		t.Fatalf("expected env shutdown-timeout override, got %d", cfg.ShutdownTimeoutSec)
 	}
-	if len(Cfg.AllowedOrigins) != 2 {
-		t.Fatalf("expected 2 allowed origins, got %d", len(Cfg.AllowedOrigins))
+	if len(cfg.AllowedOrigins) != 2 {
+		t.Fatalf("expected 2 allowed origins, got %d", len(cfg.AllowedOrigins))
 	}
-	if !Cfg.EnableExecCommand {
+	if !cfg.EnableExecCommand {
 		t.Fatalf("expected env enable-exec-command override to win")
 	}
-	if Cfg.ExecCommandTimeoutSec != 21 {
-		t.Fatalf("expected env exec timeout override, got %d", Cfg.ExecCommandTimeoutSec)
+	if cfg.ExecCommandTimeoutSec != 21 {
+		t.Fatalf("expected env exec timeout override, got %d", cfg.ExecCommandTimeoutSec)
 	}
-	if Cfg.ExecCommandMaxOutputBytes != 4096 {
-		t.Fatalf("expected env exec max output override, got %d", Cfg.ExecCommandMaxOutputBytes)
+	if cfg.ExecCommandMaxOutputBytes != 4096 {
+		t.Fatalf("expected env exec max output override, got %d", cfg.ExecCommandMaxOutputBytes)
 	}
-	if !Cfg.ExecCommandAllowBackground {
+	if !cfg.ExecCommandAllowBackground {
 		t.Fatalf("expected env exec background override to win")
 	}
-	if Cfg.ExecCommandWorkingDir != dir {
-		t.Fatalf("expected env exec working dir override, got %q", Cfg.ExecCommandWorkingDir)
+	if cfg.ExecCommandWorkingDir != dir {
+		t.Fatalf("expected env exec working dir override, got %q", cfg.ExecCommandWorkingDir)
 	}
-	if len(Cfg.ExecCommandAllowlist) != 2 {
-		t.Fatalf("expected 2 exec prefixes, got %d", len(Cfg.ExecCommandAllowlist))
+	if len(cfg.ExecCommandAllowlist) != 2 {
+		t.Fatalf("expected 2 exec prefixes, got %d", len(cfg.ExecCommandAllowlist))
 	}
 }

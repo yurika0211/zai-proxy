@@ -83,6 +83,7 @@ func (s *requestStats) endRequest() {
 }
 
 func (s *requestStats) snapshot() statsSnapshot {
+	cfg := config.GetConfig()
 	uptime := time.Since(s.startedAt).Round(time.Second)
 	if uptime < 0 {
 		uptime = 0
@@ -90,10 +91,10 @@ func (s *requestStats) snapshot() statsSnapshot {
 
 	return statsSnapshot{
 		Status:            "ok",
-		Listen:            config.Cfg.Listen,
-		LogLevel:          config.Cfg.LogLevel,
-		CORS:              config.Cfg.EnableCORS,
-		AllowedOrigins:    append([]string(nil), config.Cfg.AllowedOrigins...),
+		Listen:            cfg.Listen,
+		LogLevel:          cfg.LogLevel,
+		CORS:              cfg.EnableCORS,
+		AllowedOrigins:    append([]string(nil), cfg.AllowedOrigins...),
 		StartedAt:         s.startedAt.UTC(),
 		StartedAtUnix:     s.startedAt.Unix(),
 		UptimeSeconds:     int64(uptime / time.Second),
@@ -121,7 +122,8 @@ func (s *requestStats) currentRPM() int64 {
 }
 
 func HandleHealthz(w http.ResponseWriter, r *http.Request) {
-	if !config.Cfg.EnableStatusPage {
+	cfg := config.GetConfig()
+	if !cfg.EnableStatusPage {
 		http.NotFound(w, r)
 		return
 	}
@@ -140,7 +142,8 @@ func HandleHealthz(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleStats(w http.ResponseWriter, r *http.Request) {
-	if !config.Cfg.EnableStatusPage {
+	cfg := config.GetConfig()
+	if !cfg.EnableStatusPage {
 		http.NotFound(w, r)
 		return
 	}

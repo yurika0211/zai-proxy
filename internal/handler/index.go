@@ -8,7 +8,8 @@ import (
 )
 
 func HandleIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" || !config.Cfg.EnableStatusPage {
+	cfg := config.GetConfig()
+	if r.URL.Path != "/" || !cfg.EnableStatusPage {
 		http.NotFound(w, r)
 		return
 	}

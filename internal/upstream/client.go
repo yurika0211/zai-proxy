@@ -230,7 +230,9 @@ func MakeUpstreamRequest(token string, messages []model.Message, modelName strin
 	req.Header.Set("Referer", fmt.Sprintf("https://chat.z.ai/c/%s", uuid.New().String()))
 	req.Header.Set("User-Agent", uarand.GetRandom())
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 300 * time.Second, // 5 min overall timeout for long streaming responses
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, "", err
