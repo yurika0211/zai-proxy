@@ -1,13 +1,11 @@
 package tools
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestGetBuiltinTools_Count(t *testing.T) {
 	tools := GetBuiltinTools()
-	if len(tools) != 6 {
-		t.Errorf("len(GetBuiltinTools()) = %d, want 6", len(tools))
+	if len(tools) != 3 {
+		t.Errorf("len(GetBuiltinTools()) = %d, want 3", len(tools))
 	}
 }
 
@@ -21,12 +19,9 @@ func TestGetBuiltinTools_AllFunction(t *testing.T) {
 
 func TestGetBuiltinTools_Names(t *testing.T) {
 	expected := map[string]bool{
-		"get_current_time":  true,
-		"calculate":         true,
-		"search_web":        true,
-		"query_database":    true,
-		"file_operations":   true,
-		"call_external_api": true,
+		"get_current_time": true,
+		"calculate":        true,
+		"exec_command":     true,
 	}
 
 	tools := GetBuiltinTools()

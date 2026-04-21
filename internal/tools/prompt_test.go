@@ -94,6 +94,21 @@ func TestBuildToolSystemPrompt_ToolChoiceSpecific(t *testing.T) {
 	}
 }
 
+func TestBuildToolSystemPrompt_WithExecCommand(t *testing.T) {
+	tools := []model.Tool{{
+		Type:     "function",
+		Function: model.ToolFunction{Name: "exec_command"},
+	}}
+
+	result := BuildToolSystemPrompt(tools, nil)
+	if !strings.Contains(result, "不要假装已经执行") {
+		t.Error("should instruct the model not to pretend command execution")
+	}
+	if !strings.Contains(result, "shell 语法") {
+		t.Error("should mention shell syntax restrictions")
+	}
+}
+
 func TestConvertToolCallToText(t *testing.T) {
 	toolCalls := []model.ToolCall{
 		{

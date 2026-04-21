@@ -1,11 +1,17 @@
 package tools
 
-import "zai-proxy/internal/model"
+import (
+	"fmt"
+	"strings"
 
-// GetBuiltinTools 返回所有内置工具定义
+	"zai-proxy/internal/config"
+	"zai-proxy/internal/model"
+)
+
+// GetBuiltinTools 返回当前会被 `-tools` 自动注入的内置工具定义。
+// 这里只保留代理能够真正执行的 builtin tools，避免向模型暴露注定失败的工具。
 func GetBuiltinTools() []model.Tool {
-	return []model.Tool{
-		// 多功能助手
+	tools := []model.Tool{
 		{
 			Type: "function",
 			Function: model.ToolFunction{
@@ -44,106 +50,51 @@ func GetBuiltinTools() []model.Tool {
 				},
 			},
 		},
-		{
-			Type: "function",
-			Function: model.ToolFunction{
-				Name:        "search_web",
-				Description: "搜索网络获取实时信息",
-				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"query": map[string]interface{}{
-							"type":        "string",
-							"description": "搜索关键词",
-						},
-						"num_results": map[string]interface{}{
-							"type":        "integer",
-							"description": "返回结果数量，默认5",
-						},
-					},
-					"required": []string{"query"},
-				},
-			},
-		},
-		// 数据库查询
-		{
-			Type: "function",
-			Function: model.ToolFunction{
-				Name:        "query_database",
-				Description: "执行SQL查询获取数据",
-				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"sql": map[string]interface{}{
-							"type":        "string",
-							"description": "SQL查询语句",
-						},
-						"database": map[string]interface{}{
-							"type":        "string",
-							"description": "目标数据库名称",
-						},
-					},
-					"required": []string{"sql"},
-				},
-			},
-		},
-		// 文件操作
-		{
-			Type: "function",
-			Function: model.ToolFunction{
-				Name:        "file_operations",
-				Description: "执行文件操作，支持读取、写入和列出文件",
-				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"operation": map[string]interface{}{
-							"type":        "string",
-							"enum":        []string{"read", "write", "list"},
-							"description": "操作类型：read（读取）、write（写入）、list（列出）",
-						},
-						"path": map[string]interface{}{
-							"type":        "string",
-							"description": "文件或目录路径",
-						},
-						"content": map[string]interface{}{
-							"type":        "string",
-							"description": "写入内容（仅 write 操作需要）",
-						},
-					},
-					"required": []string{"operation", "path"},
-				},
-			},
-		},
-		// API集成
-		{
-			Type: "function",
-			Function: model.ToolFunction{
-				Name:        "call_external_api",
-				Description: "调用外部API接口",
-				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"url": map[string]interface{}{
-							"type":        "string",
-							"description": "API请求URL",
-						},
-						"method": map[string]interface{}{
-							"type":        "string",
-							"enum":        []string{"GET", "POST", "PUT", "DELETE"},
-							"description": "HTTP请求方法",
-						},
-						"headers": map[string]interface{}{
-							"type":        "object",
-							"description": "请求头",
-						},
-						"body": map[string]interface{}{
-							"type":        "string",
-							"description": "请求体（JSON字符串）",
-						},
-					},
-					"required": []string{"url", "method"},
-				},
-			},
-		},
 	}
+
+	execSettings := config.CurrentExecCommandSettings()
+	if execSettings.Enabled {
+		tools = append(tools, model.Tool{
+			Type: "function",
+			Function: model.ToolFunction{
+				Name:        "exec_command",
+				Description: fmt.Sprintf("在受控白名单内执行终端命令。适合查看目录、读取文件、运行测试或启动开发服务器。仅允许这些命令前缀：%s。不支持管道、重定向、&&、|| 等 shell 语法。", strings.Join(execSettings.Allowlist, ", ")),
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"command": map[string]interface{}{
+							"type":        "string",
+							"description": "要执行的命令。可以写成简单命令行（如 npm run dev, go test ./...），但不能包含 shell 运算符。",
+						},
+						"args": map[string]interface{}{
+							"type": "array",
+							"items": map[string]interface{}{
+								"type": "string",
+							},
+							"description": "可选。推荐显式传参；如果提供 args，command 应只包含可执行文件名。",
+						},
+						"workdir": map[string]interface{}{
+							"type":        "string",
+							"description": "可选。执行目录，必须位于代理允许的工作目录内。相对路径按配置工作目录解析。",
+						},
+						"timeout_sec": map[string]interface{}{
+							"type":        "integer",
+							"description": "可选。前台执行超时秒数；默认使用代理配置值。",
+						},
+						"run_in_background": map[string]interface{}{
+							"type":        "boolean",
+							"description": "可选。为 true 时后台启动长时间运行的进程，并返回 pid 与日志文件路径。",
+						},
+						"description": map[string]interface{}{
+							"type":        "string",
+							"description": "可选。对这次执行目的的简短说明。",
+						},
+					},
+					"required": []string{"command"},
+				},
+			},
+		})
+	}
+
+	return tools
 }

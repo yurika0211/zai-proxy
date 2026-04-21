@@ -2,7 +2,7 @@ package logger
 
 import (
 	"fmt"
-	"os"
+	"strings"
 	"time"
 )
 
@@ -23,18 +23,17 @@ var (
 		WARN:  "WARN",
 		ERROR: "ERROR",
 	}
-	// ANSI 颜色
 	levelColors = map[LogLevel]string{
-		DEBUG: "\033[36m", // 青色
-		INFO:  "\033[32m", // 绿色
-		WARN:  "\033[33m", // 黄色
-		ERROR: "\033[31m", // 红色
+		DEBUG: "\033[36m",
+		INFO:  "\033[32m",
+		WARN:  "\033[33m",
+		ERROR: "\033[31m",
 	}
 	resetColor = "\033[0m"
 )
 
-func InitLogger() {
-	level := os.Getenv("LOG_LEVEL")
+func InitLogger(level string) {
+	level = strings.TrimSpace(level)
 	switch level {
 	case "debug", "DEBUG":
 		currentLevel = DEBUG

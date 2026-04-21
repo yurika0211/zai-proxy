@@ -96,19 +96,6 @@ func MakeUpstreamRequest(token string, messages []model.Message, modelName strin
 		}
 	}
 
-	// 当使用 -tools 模型时，自动注入内置工具（客户端自带工具优先）
-	if model.IsToolsModel(modelName) {
-		clientToolNames := make(map[string]bool)
-		for _, t := range tools {
-			clientToolNames[t.Function.Name] = true
-		}
-		for _, bt := range builtintools.GetBuiltinTools() {
-			if !clientToolNames[bt.Function.Name] {
-				tools = append(tools, bt)
-			}
-		}
-	}
-
 	var upstreamMessages []map[string]interface{}
 	hasPromptTools := len(tools) > 0
 

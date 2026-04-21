@@ -1,0 +1,98 @@
+# Codex Proxy — 可选数据库与应用
+#
+# 仅 PostgreSQL：
+#   docker compose --profile postgres up -d
+#
+# 仅 MySQL：
+#   docker compose --profile mysql up -d
+#
+# 同时启动两个库（本机切换驱动测试）：
+#   docker compose --profile postgres --profile mysql up -d
+#
+# 启动应用（需已存在 ./config.yaml；库与应用同网络时 db-host 填服务名 postgres 或 mysql）：
+#   docker compose --profile postgres --profile app up -d
+#   docker compose --profile mysql --profile app up -d
+#
+# 可通过同目录 .env 覆盖账号密码（见下方 environment 变量名）。
+
+name: codex-proxy
+
+networks:
+  codex-net:
+    driver: bridge
+
+volumes:
+  codex_pg_data:
+#  codex_mysql_data:
+
+services:
+
+  codex-proxy:
+    build: .
+    image: ghcr.io/xxxxteam/codex-proxy:latest
+    profiles: ["app"]
+    container_name: codex-proxy-app
+    restart: always
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./auths:/app/auths
+    networks:
+      - codex-net
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    container_name: codex-proxy-pg
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-codex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-codex}
+      POSTGRES_DB: ${POSTGRES_DB:-codex_proxy}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - codex_pg_data:/var/lib/postgresql/data
+    networks:
+      - codex-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # mysql:
+  #   image: mysql:8.4
+  #   profiles: ["mysql"]
+  #   container_name: codex-proxy-mysql
+  #   restart: unless-stopped
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+  #     MYSQL_DATABASE: ${MYSQL_DATABASE:-codex_proxy}
+  #     MYSQL_USER: ${MYSQL_USER:-codex}
+  #     MYSQL_PASSWORD: ${MYSQL_PASSWORD:-codex}
+  #   ports:
+  #     - "${MYSQL_PORT:-3306}:3306"
+  #   volumes:
+  #     - codex_mysql_data:/var/lib/mysql
+  #   networks:
+  #     - codex-net
+  #   command:
+  #     - --character-set-server=utf8mb4
+  #     - --collation-server=utf8mb4_unicode_ci
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
+  #     interval: 8s
+  #     timeout: 5s
+  #     retries: 12
+  #     start_period: 30s
+    # 与数据库同 compose 时，config.yaml 示例：
+    #   db-enabled: true
+    #   db-driver: postgres   # 或 mysql
+    #   db-host: postgres     # 或 mysql（服务名）
+    #   db-port: 5432         # MySQL 填 3306
+    #   db-user: codex
+    #   db-password: codex    # 与上方 environment 默认值一致
+    #   db-name: codex_proxy

@@ -3,6 +3,7 @@ package handler
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,7 +15,7 @@ import (
 	"zai-proxy/internal/filter"
 	"zai-proxy/internal/logger"
 	"zai-proxy/internal/model"
-	"zai-proxy/internal/upstream"
+	toolset "zai-proxy/internal/tools"
 )
 
 // HandleMessages handles Anthropic Messages API requests (/v1/messages)
@@ -49,19 +50,38 @@ func HandleMessages(w http.ResponseWriter, r *http.Request) {
 		req.MaxTokens = 8192
 	}
 
-	// Determine if thinking is enabled
 	thinkingEnabled := false
 	if req.Thinking != nil && req.Thinking.Type == "enabled" {
 		thinkingEnabled = true
 	}
 
-	// Resolve Claude model name to GLM model name
-	resolvedModel, _ := model.ResolveClaudeModel(req.Model, thinkingEnabled)
-
-	// Convert Anthropic messages to internal format
 	messages, tools, toolChoice := convertAnthropicToInternal(req)
+	resolvedModel, _ := model.ResolveClaudeModel(req.Model, thinkingEnabled)
+	effectiveTools := toolset.ResolveEffectiveTools(resolvedModel, tools)
+	messageID := fmt.Sprintf("msg_%s", uuid.New().String()[:24])
 
-	resp, modelName, err := upstream.MakeUpstreamRequest(token, messages, resolvedModel, tools, toolChoice)
+	if !req.Stream {
+		turn, modelName, err := runAutoToolLoop(token, messages, resolvedModel, effectiveTools.Tools, toolChoice, effectiveTools.InjectedBuiltinNames, "toolu_")
+		if err != nil {
+			handleAnthropicUpstreamError(w, err)
+			return
+		}
+		writeAnthropicNonStreamTurn(w, messageID, req.Model, turn)
+		_ = modelName
+		return
+	}
+
+	if effectiveTools.HasInjectedBuiltins() {
+		turn, _, err := runAutoToolLoop(token, messages, resolvedModel, effectiveTools.Tools, toolChoice, effectiveTools.InjectedBuiltinNames, "toolu_")
+		if err != nil {
+			handleAnthropicUpstreamError(w, err)
+			return
+		}
+		writeAnthropicStreamTurn(w, messageID, req.Model, turn)
+		return
+	}
+
+	resp, modelName, err := makeUpstreamRequest(token, messages, resolvedModel, effectiveTools.Tools, toolChoice)
 	if err != nil {
 		logger.LogError("Upstream request failed: %v", err)
 		writeAnthropicError(w, http.StatusBadGateway, "api_error", "Upstream error")
@@ -80,13 +100,19 @@ func HandleMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	messageID := fmt.Sprintf("msg_%s", uuid.New().String()[:24])
+	handleAnthropicStream(w, resp.Body, messageID, modelName, req.Model, effectiveTools.Tools)
+}
 
-	if req.Stream {
-		handleAnthropicStream(w, resp.Body, messageID, modelName, req.Model, tools)
-	} else {
-		handleAnthropicNonStream(w, resp.Body, messageID, modelName, req.Model, tools)
+func handleAnthropicUpstreamError(w http.ResponseWriter, err error) {
+	var statusErr *upstreamStatusError
+	if errors.As(err, &statusErr) {
+		logger.LogError("Upstream error: status=%d, body=%s", statusErr.StatusCode, statusErr.Body)
+		writeAnthropicError(w, statusErr.StatusCode, "api_error", "Upstream error")
+		return
 	}
+
+	logger.LogError("Upstream request failed: %v", err)
+	writeAnthropicError(w, http.StatusBadGateway, "api_error", "Upstream error")
 }
 
 // convertAnthropicToInternal converts Anthropic request format to internal Message/Tool format
@@ -129,38 +155,44 @@ func convertAnthropicToInternal(req model.AnthropicRequest) ([]model.Message, []
 					Content: text,
 				})
 			} else {
-				// Process content blocks - may contain tool_result
+				var userContent []interface{}
+				flushUserContent := func() {
+					if len(userContent) == 0 {
+						return
+					}
+					messages = append(messages, model.Message{
+						Role:    "user",
+						Content: append([]interface{}(nil), userContent...),
+					})
+					userContent = nil
+				}
+
+				// Process content blocks - may contain text, image, or tool_result
 				for _, block := range blocks {
 					switch block.Type {
 					case "text":
-						messages = append(messages, model.Message{
-							Role:    "user",
-							Content: block.Text,
-						})
-					case "tool_result":
-						// Convert tool_result to tool role message
-						resultContent := ""
-						switch c := block.Content.(type) {
-						case string:
-							resultContent = c
-						case []interface{}:
-							for _, item := range c {
-								if part, ok := item.(map[string]interface{}); ok {
-									if t, ok := part["text"].(string); ok {
-										resultContent += t
-									}
-								}
-							}
-						}
-						messages = append(messages, model.Message{
-							Role:       "tool",
-							Content:    resultContent,
-							ToolCallID: block.ToolUseID,
+						userContent = append(userContent, map[string]interface{}{
+							"type": "text",
+							"text": block.Text,
 						})
 					case "image":
-						// Skip image blocks for now
+						if imageURL := anthropicImageBlockToDataURL(block); imageURL != "" {
+							userContent = append(userContent, map[string]interface{}{
+								"type":      "image_url",
+								"image_url": map[string]interface{}{"url": imageURL},
+							})
+						}
+					case "tool_result":
+						flushUserContent()
+						messages = append(messages, model.Message{
+							Role:       "tool",
+							Content:    extractAnthropicToolResultContent(block.Content),
+							ToolCallID: block.ToolUseID,
+						})
 					}
 				}
+
+				flushUserContent()
 			}
 
 		case "assistant":
@@ -209,12 +241,15 @@ func convertAnthropicToInternal(req model.AnthropicRequest) ([]model.Message, []
 	// Convert Anthropic tools to OpenAI format
 	var tools []model.Tool
 	for _, t := range req.Tools {
+		name := anthropicToolName(t)
+		description := anthropicToolDescription(t)
+		parameters := anthropicToolInputSchema(t)
 		tools = append(tools, model.Tool{
 			Type: "function",
 			Function: model.ToolFunction{
-				Name:        t.Name,
-				Description: t.Description,
-				Parameters:  t.InputSchema,
+				Name:        name,
+				Description: description,
+				Parameters:  parameters,
 			},
 		})
 	}
@@ -244,6 +279,146 @@ func convertAnthropicToInternal(req model.AnthropicRequest) ([]model.Message, []
 	}
 
 	return messages, tools, toolChoice
+}
+
+func anthropicImageBlockToDataURL(block model.AnthropicContentBlock) string {
+	if block.Source == nil {
+		return ""
+	}
+	if block.Source.Type != "base64" || block.Source.MediaType == "" || block.Source.Data == "" {
+		return ""
+	}
+	return fmt.Sprintf("data:%s;base64,%s", block.Source.MediaType, block.Source.Data)
+}
+
+func extractAnthropicToolResultContent(content interface{}) string {
+	switch c := content.(type) {
+	case string:
+		return c
+	case []interface{}:
+		var result strings.Builder
+		for _, item := range c {
+			if part, ok := item.(map[string]interface{}); ok {
+				if t, ok := part["text"].(string); ok {
+					result.WriteString(t)
+				}
+			}
+		}
+		if result.Len() > 0 {
+			return result.String()
+		}
+		data, err := json.Marshal(c)
+		if err == nil {
+			return string(data)
+		}
+		return ""
+	case map[string]interface{}:
+		data, err := json.Marshal(c)
+		if err == nil {
+			return string(data)
+		}
+		return ""
+	default:
+		data, err := json.Marshal(c)
+		if err == nil {
+			return string(data)
+		}
+		return ""
+	}
+}
+
+func anthropicToolName(t model.AnthropicTool) string {
+	if t.Name != "" {
+		return t.Name
+	}
+	switch {
+	case strings.HasPrefix(t.Type, "bash_"):
+		return "bash"
+	case strings.HasPrefix(t.Type, "text_editor_"):
+		return "str_replace_based_edit_tool"
+	default:
+		return ""
+	}
+}
+
+func anthropicToolDescription(t model.AnthropicTool) string {
+	if t.Description != "" {
+		return t.Description
+	}
+	switch {
+	case strings.HasPrefix(t.Type, "bash_"):
+		return "Execute shell commands in a persistent bash session. Use input.command to run a command or input.restart to restart the session."
+	case strings.HasPrefix(t.Type, "text_editor_"):
+		return "View and edit text files. Supported commands include view, str_replace, create, insert, and undo_edit, all passed via input.command."
+	default:
+		return ""
+	}
+}
+
+func anthropicToolInputSchema(t model.AnthropicTool) interface{} {
+	if t.InputSchema != nil {
+		return t.InputSchema
+	}
+
+	switch {
+	case strings.HasPrefix(t.Type, "bash_"):
+		return map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"command": map[string]interface{}{
+					"type":        "string",
+					"description": "The bash command to run in the persistent session.",
+				},
+				"restart": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Set to true to restart the bash session instead of running a command.",
+				},
+			},
+		}
+	case strings.HasPrefix(t.Type, "text_editor_"):
+		return map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"command": map[string]interface{}{
+					"type":        "string",
+					"enum":        []string{"view", "str_replace", "create", "insert", "undo_edit"},
+					"description": "Text editor command to execute.",
+				},
+				"path": map[string]interface{}{
+					"type":        "string",
+					"description": "Path to the file or directory being read or edited.",
+				},
+				"view_range": map[string]interface{}{
+					"type":        "array",
+					"items":       map[string]interface{}{"type": "integer"},
+					"description": "Optional start and end line numbers for the view command.",
+				},
+				"old_str": map[string]interface{}{
+					"type":        "string",
+					"description": "Exact text to replace when using str_replace.",
+				},
+				"new_str": map[string]interface{}{
+					"type":        "string",
+					"description": "Replacement text for str_replace.",
+				},
+				"file_text": map[string]interface{}{
+					"type":        "string",
+					"description": "Content to write when using the create command.",
+				},
+				"insert_line": map[string]interface{}{
+					"type":        "integer",
+					"description": "Line number after which to insert text for the insert command.",
+				},
+				"insert_text": map[string]interface{}{
+					"type":        "string",
+					"description": "Text to insert for the insert command.",
+				},
+			},
+			"required": []string{"command", "path"},
+		}
+	default:
+		return nil
+	}
 }
 
 // handleAnthropicStream processes upstream SSE and converts to Anthropic streaming format
@@ -656,7 +831,7 @@ func handleAnthropicStream(w http.ResponseWriter, body io.ReadCloser, messageID,
 		}{
 			StopReason: stopReason,
 		},
-		Usage: model.AnthropicUsage{OutputTokens: contentBlockIndex * 100}, // Rough estimate
+		Usage: model.AnthropicUsage{},
 	})
 
 	// Send message_stop
@@ -848,7 +1023,7 @@ func handleAnthropicNonStream(w http.ResponseWriter, body io.ReadCloser, message
 		Content:    contentBlocks,
 		Model:      requestModel,
 		StopReason: stopReason,
-		Usage:      model.AnthropicUsage{InputTokens: 100, OutputTokens: len(fullContent) / 4},
+		Usage:      model.AnthropicUsage{},
 	}
 
 	w.Header().Set("Content-Type", "application/json")

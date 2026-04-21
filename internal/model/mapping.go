@@ -15,12 +15,12 @@ var BaseModelMapping = map[string]string{
 
 // Claude 模型名到 GLM 基础模型名的映射
 var ClaudeModelMapping = map[string]string{
-	"claude-opus-4-6":           "GLM-4.7",
-	"claude-opus-4-5-20250514":  "GLM-4.7",
-	"claude-sonnet-4-6":         "GLM-4.7",
+	"claude-opus-4-6":            "GLM-4.7",
+	"claude-opus-4-5-20250514":   "GLM-4.7",
+	"claude-sonnet-4-6":          "GLM-4.7",
 	"claude-sonnet-4-5-20241022": "GLM-4.7",
-	"claude-haiku-4-5":          "GLM-4.5-Air",
-	"claude-haiku-4-5-20251001": "GLM-4.5-Air",
+	"claude-haiku-4-5":           "GLM-4.5-Air",
+	"claude-haiku-4-5-20251001":  "GLM-4.5-Air",
 	"claude-3-5-sonnet-20241022": "GLM-4.7",
 	"claude-3-5-haiku-20241022":  "GLM-4.5-Air",
 }
@@ -44,8 +44,6 @@ func ResolveClaudeModel(model string, thinkingEnabled bool) (resolvedModel strin
 	if enableThinking {
 		resolvedModel += "-thinking"
 	}
-	// Always enable tools for Claude requests (handled via prompt injection)
-	resolvedModel += "-tools"
 	return resolvedModel, enableThinking
 }
 

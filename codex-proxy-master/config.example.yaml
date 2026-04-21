@@ -1,0 +1,189 @@
+# Codex Proxy 配置文件
+# 将 Codex 账号文件放到 auth-dir 指定的目录中
+
+# 监听地址
+listen: ":8080"
+
+# 账号文件目录（存放 JSON 格式的 Codex 账号文件，DB 模式时可留空）
+auth-dir: "./auths"
+
+# 使用数据库存储账号（db-driver: postgres | mysql | sqlite）
+# db-enabled: true
+# db-driver: postgres
+# db-host: 127.0.0.1
+# db-port: 5432
+# db-user: username
+# db-password: password
+# db-name: codex_proxy
+# db-sslmode: disable
+# db-dsn: ""  # 若配置则优先使用 DSN（各驱动原生连接串）
+# 连接池（0 表示按 refresh-concurrency 自动估算；db-conn-max-lifetime-sec 默认 1800）
+# db-max-open-conns: 0
+# db-max-idle-conns: 0
+# db-conn-max-lifetime-sec: 0
+#
+# MySQL 示例（db-port 默认 3306）:
+# db-driver: mysql
+# db-host: 127.0.0.1
+# db-port: 3306
+# db-user: root
+# db-password: secret
+# db-name: codex_proxy
+#
+# SQLite 示例（未配 db-dsn 时 db-name 为本地文件路径，默认 codex_proxy.db）:
+# db-driver: sqlite
+# db-name: "./data/codex.db"
+
+# 后端域名（所有 API 统一走 https://<backend-domain>/backend-api/...）
+# 与 base-url 二选一；当 base-url 已配置时，会自动按 base-url 的主机名推导 backend-domain
+backend-domain: "chatgpt.com"
+
+# 可选：后端解析地址（支持 CNAME 或 A 记录；可写 host 或 host:port）
+# backend-resolve-address: "your-cname-or-ip"
+
+# Codex API 基础 URL（可选，配置后优先于 backend-domain）
+# base-url: "https://chatgpt.com/backend-api/codex"
+
+# HTTP/HTTPS/SOCKS5 代理地址（可选）
+# 支持格式:
+#   HTTP 代理: http://host:port 或 http://user:pass@host:port
+#   HTTPS 代理: https://host:port 或 https://user:pass@host:port
+#   SOCKS5 代理: socks5://host:port 或 socks5://user:pass@host:port
+#   SOCKS5(DNS via proxy): socks5h://host:port 或 socks5h://user:pass@host:port
+# 例如: proxy-url: "socks5://127.0.0.1:1080"
+# proxy-url: "http://127.0.0.1:7890"
+
+# 日志级别: debug, info, warn, error
+log-level: "info"
+
+# 排障：按行/块 Info 打印上游 Codex SSE 原始内容（Chat 与 Responses 流式）；日志量极大且可能含用户数据，用完请关闭
+# debug-upstream-stream: true
+
+# Token 自动刷新间隔（秒）
+refresh-interval: 3000
+
+# 未单独写 refresh-http-status-policy / quota-http-status-policy 时，仍可用简写（仅 phase=none）：
+# refresh-http-429-action: cooldown   # 等价于 429: { phase: none, final: cooldown }
+# quota-http-429-action: cooldown
+# quota-http-status-actions:           # 旧式，等价于各状态 phase=none
+#   "401": disable
+#
+# 按 HTTP 状态码两阶段策略（刷新 token / 额度 wham/usage 分别配置）：
+#   phase: none                 — 直接执行 final
+#   phase: refresh_once         — 先立刻再刷新一次 token（额度场景会先刷 token 再重查 usage）；若仍是同一状态码则执行 final
+#   phase: cooldown_then_retry  — 先按状态等待（401 用 cooldown-401-sec，429 用 cooldown-429-sec）再重试一次；仍同一状态码则执行 final
+#   final: remove | disable | cooldown
+#
+# refresh-http-status-policy:
+#   "401":
+#     phase: refresh_once
+#     final: remove
+#   "429":
+#     phase: cooldown_then_retry
+#     final: remove
+#
+# quota-http-status-policy:
+#   "401":
+#     phase: refresh_once
+#     final: remove
+#   "429":
+#     phase: cooldown_then_retry
+#     final: remove
+
+# 请求失败最大重试次数（切换账号重试，0 表示不重试）
+# 总尝试次数 = max-retry + 1。启用 enable-healthy-retry 且 max-retry>=2 时：
+# 前 (max-retry-1) 次用常规轮询换号，从第 max-retry 次起改用「最近调用成功」的账号，减少无效切换耗时。
+max-retry: 2
+
+# 是否在换号重试中使用「最近成功账号」策略（false 则全程常规选号，且无末尾回退）
+enable-healthy-retry: true
+
+# 健康检查间隔（秒），0 表示禁用健康检查
+health-check-interval: 300
+
+# 连续失败多少次后自动禁用账号
+health-check-max-failures: 2
+
+# 健康检查并发数
+health-check-concurrency: 5
+
+# 启动后延迟多少秒再开始健康检查（避免和冷启动流量抢资源）
+health-check-start-delay: 45
+
+# 每轮健康检查最多抽查多少个账号（0 表示全量）
+health-check-batch-size: 20
+
+# 定时健康检查单次请求超时（秒）；仅影响后台巡检，不影响对话 API
+health-check-request-timeout: 8
+
+# disabled-recovery-interval-sec: 3600
+# 仅磁盘 JSON（db-enabled: false）：周期将 *.json.disabled 还原为 .json，OAuth 刷新并同步查额度；不通过则删除凭据（不再改回 .disabled）。0 表示关闭。启动后约 90s 首次执行。
+
+# Token 并发刷新数（2w 账号建议 100-200）
+refresh-concurrency: 50
+
+# 启动即服务可用：先启动 HTTP，再后台加载账号（推荐开启）
+startup-async-load: true
+
+# 后台加载模式下，加载失败后重试间隔（秒）
+# startup-load-retry-interval: 10
+
+# startup-async-load：磁盘模式每批 JSON 文件数，或 db-enabled 时每批从库读取行数（默认 8000，不必等全量即可选号）
+# startup-load-batch-size: 8000
+
+# 优雅关闭时等待 HTTP 请求完成的超时（秒，1-60）
+# shutdown-timeout: 5
+
+# 热加载扫描 auth 目录间隔（秒）
+# auth-scan-interval: 30
+
+# 异步磁盘写入 Token 的工作协程数（1-32，账号多时可适当增大）
+# save-workers: 4
+
+# 401 后账号冷却时间（秒）
+# cooldown-401-sec: 30
+
+# 429 限频后账号冷却时间（秒）
+# cooldown-429-sec: 60
+
+# 后台 OAuth 刷新 / 401 恢复等单次请求超时（秒）；不影响 Codex 对话 SSE
+# refresh-single-timeout-sec: 30
+
+# 请求路径上「401→同步 OAuth」的全局并发上限（0=不限制）。高并发易把 OAuth 打 429 时，可设 48~128：
+# 槽满则直接换号、不打刷新接口，WARN「刷新 HTTP 429」会少很多；后台 refresh-interval 仍会修 Token。
+# auth-401-sync-refresh-concurrency: 0
+
+# 额度查询并发数（0 表示使用 refresh-concurrency）
+# quota-check-concurrency: 0
+
+# 连接池保活 ping 间隔（秒）
+# keepalive-interval: 60
+
+# 空返回时最多再重试次数
+# empty-retry-max: 2
+
+# 选号策略: round-robin | quota-first（每次选额度最高）
+# selector: "round-robin"
+
+# 刷新批大小（0=不分批）；>0 时每批完成后再启下一批，降低大账号数时的内存
+# refresh-batch-size: 0
+
+# 连接池配置；HTTP/2 下单主机连接数过高易触发上游 GOAWAY ENHANCE_YOUR_CALM，宜酌情调低 max-conns-per-host / max-idle-conns-per-host
+max-conns-per-host: 512
+max-idle-conns: 1024
+max-idle-conns-per-host: 512
+
+# 是否启用出站 HTTP/2（关闭则强制 HTTP/1.1，多连接并行通常更稳）
+enable-http2: false
+
+# 管理类 HTTP 接口（若配置了 api-keys 则需带相同 Key）:
+#   POST /recover-auth  — 401 恢复：同步刷新 token；刷新 429 时查额度；仍失败则凭据重命名为 *.json.disabled
+#     请求体: {"email":"a@b.com"} 或 {"file_path":"账号.json"} 或 {"all":true}
+#   POST /refresh        — SSE 流式强制刷新全部账号
+#   POST /check-quota    — SSE 流式查询额度
+#   GET  /stats          — 账号统计
+#
+# API Key 鉴权（可选，为空则不鉴权）
+# api-keys:
+#   - "sk-your-custom-key-1"
+#   - "sk-your-custom-key-2"

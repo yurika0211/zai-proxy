@@ -101,6 +101,24 @@ func TestExtractPromptToolCalls_WithWhitespace(t *testing.T) {
 	}
 }
 
+func TestExtractPromptToolCalls_AnthropicInputFormat(t *testing.T) {
+	content := `<tool_call>{"name": "Bash", "input": {"command": "npm install", "description": "Install dependencies"}}</tool_call>`
+
+	clean, calls := ExtractPromptToolCalls(content)
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 tool call, got %d", len(calls))
+	}
+	if calls[0].Function.Name != "Bash" {
+		t.Errorf("expected Bash, got %s", calls[0].Function.Name)
+	}
+	if calls[0].Function.Arguments != `{"command": "npm install", "description": "Install dependencies"}` && calls[0].Function.Arguments != `{"command":"npm install","description":"Install dependencies"}` {
+		t.Errorf("unexpected arguments: %s", calls[0].Function.Arguments)
+	}
+	if clean != "" {
+		t.Errorf("expected empty clean content, got %q", clean)
+	}
+}
+
 func TestHasPromptToolCallOpen(t *testing.T) {
 	tests := []struct {
 		content  string

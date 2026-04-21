@@ -27,6 +27,11 @@ func TestIsFunctionToolCall_True(t *testing.T) {
 			content: `<glm_block type="tool_call">{"function":{"name":"fn1","arguments":"{}"}}</glm_block>`,
 			phase:   "tool_call",
 		},
+		{
+			name:    "Anthropic 风格 name + input",
+			content: `{"type":"tool_use","name":"Bash","input":{"command":"npm install"}}`,
+			phase:   "tool_call",
+		},
 	}
 
 	for _, tt := range tests {
@@ -128,6 +133,24 @@ func TestParseFunctionToolCalls_FlatFormat(t *testing.T) {
 	}
 	if calls[0].Type != "function" {
 		t.Errorf("Type = %q, want %q", calls[0].Type, "function")
+	}
+}
+
+func TestParseFunctionToolCalls_AnthropicToolUseFormat(t *testing.T) {
+	content := `{"id":"toolu_123","type":"tool_use","name":"Bash","input":{"command":"npm install","description":"Install dependencies"}}`
+
+	calls := ParseFunctionToolCalls(content)
+	if len(calls) != 1 {
+		t.Fatalf("len(calls) = %d, want 1", len(calls))
+	}
+	if calls[0].ID != "toolu_123" {
+		t.Errorf("ID = %q, want %q", calls[0].ID, "toolu_123")
+	}
+	if calls[0].Function.Name != "Bash" {
+		t.Errorf("Function.Name = %q, want %q", calls[0].Function.Name, "Bash")
+	}
+	if calls[0].Function.Arguments != `{"command":"npm install","description":"Install dependencies"}` {
+		t.Errorf("Function.Arguments = %q", calls[0].Function.Arguments)
 	}
 }
 

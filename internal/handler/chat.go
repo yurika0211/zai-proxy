@@ -3,6 +3,7 @@ package handler
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,11 +16,14 @@ import (
 	"zai-proxy/internal/filter"
 	"zai-proxy/internal/logger"
 	"zai-proxy/internal/model"
-	"zai-proxy/internal/upstream"
+	toolset "zai-proxy/internal/tools"
 )
 
 func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
-	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	token := r.Header.Get("x-api-key")
+	if token == "" {
+		token = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	}
 	if token == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -45,7 +49,30 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		req.Model = "GLM-4.6"
 	}
 
-	resp, modelName, err := upstream.MakeUpstreamRequest(token, req.Messages, req.Model, req.Tools, req.ToolChoice)
+	effectiveTools := toolset.ResolveEffectiveTools(req.Model, req.Tools)
+	completionID := fmt.Sprintf("chatcmpl-%s", uuid.New().String()[:29])
+
+	if !req.Stream {
+		turn, modelName, err := runAutoToolLoop(token, req.Messages, req.Model, effectiveTools.Tools, req.ToolChoice, effectiveTools.InjectedBuiltinNames, "call_")
+		if err != nil {
+			handleChatUpstreamError(w, err)
+			return
+		}
+		writeOpenAINonStreamTurn(w, completionID, modelName, turn)
+		return
+	}
+
+	if effectiveTools.HasInjectedBuiltins() {
+		turn, modelName, err := runAutoToolLoop(token, req.Messages, req.Model, effectiveTools.Tools, req.ToolChoice, effectiveTools.InjectedBuiltinNames, "call_")
+		if err != nil {
+			handleChatUpstreamError(w, err)
+			return
+		}
+		writeOpenAIStreamTurn(w, completionID, modelName, turn)
+		return
+	}
+
+	resp, modelName, err := makeUpstreamRequest(token, req.Messages, req.Model, effectiveTools.Tools, req.ToolChoice)
 	if err != nil {
 		logger.LogError("Upstream request failed: %v", err)
 		http.Error(w, "Upstream error", http.StatusBadGateway)
@@ -64,13 +91,19 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	completionID := fmt.Sprintf("chatcmpl-%s", uuid.New().String()[:29])
+	handleStreamResponse(w, resp.Body, completionID, modelName, effectiveTools.Tools)
+}
 
-	if req.Stream {
-		handleStreamResponse(w, resp.Body, completionID, modelName, req.Tools)
-	} else {
-		handleNonStreamResponse(w, resp.Body, completionID, modelName, req.Tools)
+func handleChatUpstreamError(w http.ResponseWriter, err error) {
+	var statusErr *upstreamStatusError
+	if errors.As(err, &statusErr) {
+		logger.LogError("Upstream error: status=%d, body=%s", statusErr.StatusCode, statusErr.Body)
+		http.Error(w, "Upstream error", statusErr.StatusCode)
+		return
 	}
+
+	logger.LogError("Upstream request failed: %v", err)
+	http.Error(w, "Upstream error", http.StatusBadGateway)
 }
 
 func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionID, modelName string, tools []model.Tool) {

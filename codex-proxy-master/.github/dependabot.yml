@@ -1,0 +1,41 @@
+# Dependabot 版本更新配置
+# 文档: https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Go 模块（go.mod / go.sum）
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 8
+    labels:
+      - dependencies
+      - go
+    commit-message:
+      prefix: "deps(go)"
+    groups:
+      golang-org-x:
+        patterns:
+          - "golang.org/x/*"
+      tidwall:
+        patterns:
+          - "github.com/tidwall/*"
+
+  # GitHub Actions（.github/workflows）
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:30"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "deps(ci)"

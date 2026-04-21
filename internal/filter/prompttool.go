@@ -187,18 +187,12 @@ func parsePromptToolCallJSON(content string) []model.ToolCall {
 	var call struct {
 		Name      string          `json:"name"`
 		Arguments json.RawMessage `json:"arguments"`
+		Input     json.RawMessage `json:"input"`
 	}
 	if err := json.Unmarshal([]byte(content), &call); err == nil && call.Name != "" {
-		argsStr := string(call.Arguments)
-		// 如果 arguments 不是字符串，序列化为字符串
-		if len(argsStr) > 0 && argsStr[0] != '"' {
-			// 已经是 JSON 对象/其他类型，直接用
-		} else {
-			// 是 JSON 字符串，解引用
-			var s string
-			if json.Unmarshal(call.Arguments, &s) == nil {
-				argsStr = s
-			}
+		argsStr := decodePromptToolArguments(call.Arguments)
+		if argsStr == "" {
+			argsStr = decodePromptToolArguments(call.Input)
 		}
 		return []model.ToolCall{{
 			Function: model.FunctionCall{
@@ -209,6 +203,21 @@ func parsePromptToolCallJSON(content string) []model.ToolCall {
 	}
 
 	return nil
+}
+
+func decodePromptToolArguments(raw json.RawMessage) string {
+	raw = json.RawMessage(strings.TrimSpace(string(raw)))
+	if len(raw) == 0 || string(raw) == "null" {
+		return ""
+	}
+	if raw[0] != '"' {
+		return string(raw)
+	}
+	var decoded string
+	if err := json.Unmarshal(raw, &decoded); err == nil {
+		return decoded
+	}
+	return string(raw)
 }
 
 // HasPromptToolCallOpen 检测文本中是否有未关闭的 tool call 标签

@@ -22,8 +22,11 @@ func IsFunctionToolCall(editContent string, phase string) bool {
 	if strings.Contains(editContent, `"search_result"`) || strings.Contains(editContent, `"search_image"`) {
 		return false
 	}
-	// 包含函数调用特征
-	return strings.Contains(editContent, `"function"`) || strings.Contains(editContent, `"arguments"`)
+	// 兼容 OpenAI 风格 function/arguments 和 Anthropic 风格 name/input。
+	return strings.Contains(editContent, `"function"`) ||
+		strings.Contains(editContent, `"arguments"`) ||
+		strings.Contains(editContent, `"tool_use"`) ||
+		(strings.Contains(editContent, `"name"`) && strings.Contains(editContent, `"input"`))
 }
 
 // ParseFunctionToolCalls 从上游 edit_content 解析函数调用
@@ -58,30 +61,40 @@ func parseToolCallJSON(content string) []model.ToolCall {
 		ID       string `json:"id"`
 		Type     string `json:"type"`
 		Function struct {
-			Name      string `json:"name"`
-			Arguments string `json:"arguments"`
+			Name      string          `json:"name"`
+			Arguments json.RawMessage `json:"arguments"`
+			Input     json.RawMessage `json:"input"`
 		} `json:"function"`
-		Name      string `json:"name"`
-		Arguments string `json:"arguments"`
+		Name      string          `json:"name"`
+		Arguments json.RawMessage `json:"arguments"`
+		Input     json.RawMessage `json:"input"`
 	}
 	if err := json.Unmarshal([]byte(content), &single); err == nil {
 		if single.Function.Name != "" {
+			arguments := decodeToolArgumentsField(single.Function.Arguments)
+			if arguments == "" {
+				arguments = decodeToolArgumentsField(single.Function.Input)
+			}
 			return []model.ToolCall{{
 				ID:   single.ID,
 				Type: "function",
 				Function: model.FunctionCall{
 					Name:      single.Function.Name,
-					Arguments: single.Function.Arguments,
+					Arguments: arguments,
 				},
 			}}
 		}
 		if single.Name != "" {
+			arguments := decodeToolArgumentsField(single.Arguments)
+			if arguments == "" {
+				arguments = decodeToolArgumentsField(single.Input)
+			}
 			return []model.ToolCall{{
 				ID:   single.ID,
 				Type: "function",
 				Function: model.FunctionCall{
 					Name:      single.Name,
-					Arguments: single.Arguments,
+					Arguments: arguments,
 				},
 			}}
 		}
@@ -100,4 +113,19 @@ func parseToolCallJSON(content string) []model.ToolCall {
 	}
 
 	return nil
+}
+
+func decodeToolArgumentsField(raw json.RawMessage) string {
+	raw = json.RawMessage(strings.TrimSpace(string(raw)))
+	if len(raw) == 0 || string(raw) == "null" {
+		return ""
+	}
+	if raw[0] != '"' {
+		return string(raw)
+	}
+	var decoded string
+	if err := json.Unmarshal(raw, &decoded); err == nil {
+		return decoded
+	}
+	return string(raw)
 }

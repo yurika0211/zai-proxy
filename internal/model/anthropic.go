@@ -4,19 +4,19 @@ import "encoding/json"
 
 // AnthropicRequest represents a request to the Anthropic Messages API
 type AnthropicRequest struct {
-	Model     string               `json:"model"`
-	MaxTokens int                  `json:"max_tokens"`
-	System    interface{}          `json:"system,omitempty"`    // string or []AnthropicContentBlock
-	Messages  []AnthropicMessage   `json:"messages"`
-	Tools     []AnthropicTool      `json:"tools,omitempty"`
-	ToolChoice interface{}         `json:"tool_choice,omitempty"`
-	Stream    bool                 `json:"stream"`
-	Thinking  *AnthropicThinking   `json:"thinking,omitempty"`
+	Model      string             `json:"model"`
+	MaxTokens  int                `json:"max_tokens"`
+	System     interface{}        `json:"system,omitempty"` // string or []AnthropicContentBlock
+	Messages   []AnthropicMessage `json:"messages"`
+	Tools      []AnthropicTool    `json:"tools,omitempty"`
+	ToolChoice interface{}        `json:"tool_choice,omitempty"`
+	Stream     bool               `json:"stream"`
+	Thinking   *AnthropicThinking `json:"thinking,omitempty"`
 }
 
 // AnthropicThinking controls thinking/reasoning behavior
 type AnthropicThinking struct {
-	Type         string `json:"type"`                    // "enabled" or "disabled"
+	Type         string `json:"type"` // "enabled" or "disabled"
 	BudgetTokens int    `json:"budget_tokens,omitempty"`
 }
 
@@ -84,9 +84,11 @@ type AnthropicImageSource struct {
 
 // AnthropicTool represents a tool definition in Anthropic format
 type AnthropicTool struct {
-	Name        string      `json:"name"`
-	Description string      `json:"description,omitempty"`
-	InputSchema interface{} `json:"input_schema"`
+	Type          string      `json:"type,omitempty"`
+	Name          string      `json:"name"`
+	Description   string      `json:"description,omitempty"`
+	InputSchema   interface{} `json:"input_schema"`
+	MaxCharacters int         `json:"max_characters,omitempty"`
 }
 
 // AnthropicResponse represents a non-streaming response
@@ -129,17 +131,17 @@ type AnthropicContentBlockStart struct {
 
 // AnthropicContentBlockDelta is the content_block_delta event
 type AnthropicContentBlockDelta struct {
-	Type  string                     `json:"type"` // "content_block_delta"
-	Index int                        `json:"index"`
+	Type  string                      `json:"type"` // "content_block_delta"
+	Index int                         `json:"index"`
 	Delta AnthropicContentBlockDelta2 `json:"delta"`
 }
 
 // AnthropicContentBlockDelta2 is the delta payload within content_block_delta
 type AnthropicContentBlockDelta2 struct {
-	Type         string `json:"type"`                    // "text_delta", "thinking_delta", "input_json_delta"
-	Text         string `json:"text,omitempty"`          // for text_delta
-	Thinking     string `json:"thinking,omitempty"`      // for thinking_delta
-	PartialJSON  string `json:"partial_json,omitempty"`  // for input_json_delta
+	Type        string `json:"type"`                   // "text_delta", "thinking_delta", "input_json_delta"
+	Text        string `json:"text,omitempty"`         // for text_delta
+	Thinking    string `json:"thinking,omitempty"`     // for thinking_delta
+	PartialJSON string `json:"partial_json,omitempty"` // for input_json_delta
 }
 
 // AnthropicContentBlockStop is the content_block_stop event

@@ -199,3 +199,33 @@ func TestModelList_ContainsToolsVariants(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveClaudeModel_WithExplicitTools(t *testing.T) {
+	resolved, thinking := ResolveClaudeModel("claude-sonnet-4-6", false)
+	if resolved != "GLM-4.7" {
+		t.Fatalf("resolved = %q, want GLM-4.7", resolved)
+	}
+	if thinking {
+		t.Fatal("thinking should be false")
+	}
+}
+
+func TestResolveClaudeModel_WithoutTools(t *testing.T) {
+	resolved, thinking := ResolveClaudeModel("claude-sonnet-4-6", false)
+	if resolved != "GLM-4.7" {
+		t.Fatalf("resolved = %q, want GLM-4.7", resolved)
+	}
+	if thinking {
+		t.Fatal("thinking should be false")
+	}
+}
+
+func TestResolveClaudeModel_OpusStillEnablesThinking(t *testing.T) {
+	resolved, thinking := ResolveClaudeModel("claude-opus-4-6", false)
+	if resolved != "GLM-4.7-thinking" {
+		t.Fatalf("resolved = %q, want GLM-4.7-thinking", resolved)
+	}
+	if !thinking {
+		t.Fatal("thinking should be true for opus models")
+	}
+}
