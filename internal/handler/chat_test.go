@@ -710,3 +710,196 @@ func TestTruncate_EmptyString(t *testing.T) {
 		t.Errorf("expected empty string, got %q", result)
 	}
 }
+
+// ===== handleChatUpstreamError =====
+
+func TestHandleChatUpstreamError_StatusError(t *testing.T) {
+	w := httptest.NewRecorder()
+	err := &upstreamStatusError{StatusCode: 429, Body: "rate limited"}
+	handleChatUpstreamError(w, err)
+
+	if w.Code != 429 {
+		t.Errorf("expected status 429, got %d", w.Code)
+	}
+}
+
+func TestHandleChatUpstreamError_GenericError(t *testing.T) {
+	w := httptest.NewRecorder()
+	handleChatUpstreamError(w, fmt.Errorf("connection refused"))
+
+	if w.Code != 502 {
+		t.Errorf("expected status 502, got %d", w.Code)
+	}
+}
+
+// ===== upstreamStatusError.Error =====
+
+func TestUpstreamStatusError_Error(t *testing.T) {
+	err := &upstreamStatusError{StatusCode: 500, Body: "internal error"}
+	if err.Error() != "upstream returned status 500" {
+		t.Errorf("unexpected error message: %s", err.Error())
+	}
+}
+
+// ===== writeAnthropicError =====
+
+func TestWriteAnthropicError(t *testing.T) {
+	w := httptest.NewRecorder()
+	writeAnthropicError(w, 400, "invalid_request_error", "Bad request")
+
+	if w.Code != 400 {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	errObj, ok := result["error"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected error object in response")
+	}
+	if errObj["type"] != "invalid_request_error" {
+		t.Errorf("expected invalid_request_error, got %v", errObj["type"])
+	}
+	if errObj["message"] != "Bad request" {
+		t.Errorf("expected 'Bad request', got %v", errObj["message"])
+	}
+}
+
+// ===== handleAnthropicUpstreamError =====
+
+func TestHandleAnthropicUpstreamError_StatusError(t *testing.T) {
+	w := httptest.NewRecorder()
+	err := &upstreamStatusError{StatusCode: 503, Body: "service unavailable"}
+	handleAnthropicUpstreamError(w, err)
+
+	if w.Code != 503 {
+		t.Errorf("expected status 503, got %d", w.Code)
+	}
+}
+
+func TestHandleAnthropicUpstreamError_GenericError(t *testing.T) {
+	w := httptest.NewRecorder()
+	handleAnthropicUpstreamError(w, fmt.Errorf("timeout"))
+
+	if w.Code != 502 {
+		t.Errorf("expected status 502, got %d", w.Code)
+	}
+}
+
+// ===== writeOpenAIStreamTurn =====
+
+func TestWriteOpenAIStreamTurn_ContentOnly(t *testing.T) {
+	w := httptest.NewRecorder()
+	turn := assistantTurn{Content: "hello world"}
+	writeOpenAIStreamTurn(w, "chatcmpl-test", "glm-4", turn)
+
+	body := w.Body.String()
+	if !strings.Contains(body, "hello world") {
+		t.Error("expected content in stream output")
+	}
+	if !strings.Contains(body, "[DONE]") {
+		t.Error("expected [DONE] in stream output")
+	}
+	if !strings.Contains(body, `"stop"`) {
+		t.Error("expected stop finish_reason")
+	}
+}
+
+func TestWriteOpenAIStreamTurn_WithToolCalls(t *testing.T) {
+	w := httptest.NewRecorder()
+	turn := assistantTurn{
+		Content: "let me check",
+		ToolCalls: []model.ToolCall{
+			{ID: "call_123", Function: model.FunctionCall{Name: "get_weather", Arguments: `{"city":"Beijing"}`}},
+		},
+	}
+	writeOpenAIStreamTurn(w, "chatcmpl-test", "glm-4", turn)
+
+	body := w.Body.String()
+	if !strings.Contains(body, "get_weather") {
+		t.Error("expected tool call name in stream output")
+	}
+	if !strings.Contains(body, `"tool_calls"`) {
+		t.Error("expected tool_calls finish_reason")
+	}
+}
+
+func TestWriteOpenAIStreamTurn_WithReasoning(t *testing.T) {
+	w := httptest.NewRecorder()
+	turn := assistantTurn{ReasoningContent: "thinking hard", Content: "answer"}
+	writeOpenAIStreamTurn(w, "chatcmpl-test", "glm-4", turn)
+
+	body := w.Body.String()
+	if !strings.Contains(body, "thinking hard") {
+		t.Error("expected reasoning content in stream output")
+	}
+}
+
+// ===== writeAnthropicStreamTurn =====
+
+func TestWriteAnthropicStreamTurn_ContentOnly(t *testing.T) {
+	w := httptest.NewRecorder()
+	turn := assistantTurn{Content: "hello"}
+	writeAnthropicStreamTurn(w, "msg_test", "claude-3", turn)
+
+	body := w.Body.String()
+	if !strings.Contains(body, "message_start") {
+		t.Error("expected message_start event")
+	}
+	if !strings.Contains(body, "text_delta") {
+		t.Error("expected text_delta event")
+	}
+	if !strings.Contains(body, "message_stop") {
+		t.Error("expected message_stop event")
+	}
+}
+
+func TestWriteAnthropicStreamTurn_WithToolUse(t *testing.T) {
+	w := httptest.NewRecorder()
+	turn := assistantTurn{
+		Content: "checking",
+		ToolCalls: []model.ToolCall{
+			{ID: "toolu_123", Function: model.FunctionCall{Name: "search", Arguments: `{"q":"test"}`}},
+		},
+	}
+	writeAnthropicStreamTurn(w, "msg_test", "claude-3", turn)
+
+	body := w.Body.String()
+	if !strings.Contains(body, "tool_use") {
+		t.Error("expected tool_use content block")
+	}
+	if !strings.Contains(body, `"tool_use"`) {
+		t.Error("expected tool_use stop reason")
+	}
+}
+
+func TestWriteAnthropicStreamTurn_WithReasoning(t *testing.T) {
+	w := httptest.NewRecorder()
+	turn := assistantTurn{ReasoningContent: "deep thought", Content: "result"}
+	writeAnthropicStreamTurn(w, "msg_test", "claude-3", turn)
+
+	body := w.Body.String()
+	if !strings.Contains(body, "thinking_delta") {
+		t.Error("expected thinking_delta event")
+	}
+	if !strings.Contains(body, "deep thought") {
+		t.Error("expected reasoning content in stream")
+	}
+}
+
+func TestWriteAnthropicStreamTurn_EmptyTurn(t *testing.T) {
+	w := httptest.NewRecorder()
+	turn := assistantTurn{}
+	writeAnthropicStreamTurn(w, "msg_test", "claude-3", turn)
+
+	body := w.Body.String()
+	if !strings.Contains(body, "message_start") {
+		t.Error("expected message_start event")
+	}
+	if !strings.Contains(body, "end_turn") {
+		t.Error("expected end_turn stop reason for empty turn")
+	}
+}
