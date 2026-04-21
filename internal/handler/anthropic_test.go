@@ -149,7 +149,7 @@ func TestHandleMessages_DoesNotEnableBuiltinToolsWithoutExplicitTools(t *testing
 	defer func() { makeUpstreamRequest = oldMakeUpstreamRequest }()
 
 	var capturedModel string
-	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}) (*http.Response, string, error) {
+	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}, reqParams model.RequestParams) (*http.Response, string, error) {
 		capturedModel = modelName
 		return &http.Response{
 			StatusCode: http.StatusOK,
@@ -180,7 +180,7 @@ func TestHandleMessages_EnablesToolsWhenExplicitToolsProvided(t *testing.T) {
 	defer func() { makeUpstreamRequest = oldMakeUpstreamRequest }()
 
 	var capturedModel string
-	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}) (*http.Response, string, error) {
+	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}, reqParams model.RequestParams) (*http.Response, string, error) {
 		capturedModel = modelName
 		return &http.Response{
 			StatusCode: http.StatusOK,
@@ -210,7 +210,7 @@ func TestHandleMessages_AnthropicStyleToolUseIsReturnedToClient(t *testing.T) {
 	oldMakeUpstreamRequest := makeUpstreamRequest
 	defer func() { makeUpstreamRequest = oldMakeUpstreamRequest }()
 
-	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}) (*http.Response, string, error) {
+	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}, reqParams model.RequestParams) (*http.Response, string, error) {
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Body: newFakeBody(
@@ -256,7 +256,7 @@ func TestHandleMessages_StreamAnthropicStyleToolUseIsReturnedToClient(t *testing
 	oldMakeUpstreamRequest := makeUpstreamRequest
 	defer func() { makeUpstreamRequest = oldMakeUpstreamRequest }()
 
-	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}) (*http.Response, string, error) {
+	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}, reqParams model.RequestParams) (*http.Response, string, error) {
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Body: newFakeBody(
@@ -298,7 +298,7 @@ func TestHandleChatCompletions_AcceptsXAPIKey(t *testing.T) {
 	oldMakeUpstreamRequest := makeUpstreamRequest
 	defer func() { makeUpstreamRequest = oldMakeUpstreamRequest }()
 
-	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}) (*http.Response, string, error) {
+	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}, reqParams model.RequestParams) (*http.Response, string, error) {
 		if token != "token-from-header" {
 			t.Fatalf("token = %q, want token-from-header", token)
 		}

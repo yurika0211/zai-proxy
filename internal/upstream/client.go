@@ -37,7 +37,7 @@ func ExtractAllImageURLs(messages []model.Message) []string {
 	return allImageURLs
 }
 
-func MakeUpstreamRequest(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}) (*http.Response, string, error) {
+func MakeUpstreamRequest(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}, reqParams model.RequestParams) (*http.Response, string, error) {
 	payload, err := auth.DecodeJWTPayload(token)
 	if err != nil || payload == nil {
 		return nil, "", fmt.Errorf("invalid token")
@@ -191,6 +191,29 @@ func MakeUpstreamRequest(token string, messages []model.Message, modelName strin
 		},
 		"chat_id": chatID,
 		"id":      uuid.New().String(),
+	}
+
+	// Pass through optional request parameters
+	if reqParams.Temperature != nil {
+		body["temperature"] = *reqParams.Temperature
+	}
+	if reqParams.TopP != nil {
+		body["top_p"] = *reqParams.TopP
+	}
+	if reqParams.MaxTokens != nil {
+		body["max_tokens"] = *reqParams.MaxTokens
+	}
+	if reqParams.FrequencyPenalty != nil {
+		body["frequency_penalty"] = *reqParams.FrequencyPenalty
+	}
+	if reqParams.PresencePenalty != nil {
+		body["presence_penalty"] = *reqParams.PresencePenalty
+	}
+	if reqParams.Seed != nil {
+		body["seed"] = *reqParams.Seed
+	}
+	if reqParams.ToolStream {
+		body["tool_stream"] = true
 	}
 
 	if len(mcpServers) > 0 {

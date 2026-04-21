@@ -142,12 +142,45 @@ func (m *Message) ToUpstreamMessage(urlToFileID map[string]string) map[string]in
 	}
 }
 
+// RequestParams holds optional request parameters to pass through to upstream
+type RequestParams struct {
+	Temperature      *float64
+	TopP             *float64
+	MaxTokens        *int
+	FrequencyPenalty *float64
+	PresencePenalty  *float64
+	Seed             *int
+	ToolStream       bool
+}
+
 type ChatRequest struct {
-	Model      string      `json:"model"`
-	Messages   []Message   `json:"messages"`
-	Stream     bool        `json:"stream"`
-	Tools      []Tool      `json:"tools,omitempty"`
-	ToolChoice interface{} `json:"tool_choice,omitempty"`
+	Model            string      `json:"model"`
+	Messages         []Message   `json:"messages"`
+	Stream           bool        `json:"stream"`
+	Tools            []Tool      `json:"tools,omitempty"`
+	ToolChoice       interface{} `json:"tool_choice,omitempty"`
+	Temperature      *float64    `json:"temperature,omitempty"`
+	TopP             *float64    `json:"top_p,omitempty"`
+	MaxTokens        *int        `json:"max_tokens,omitempty"`
+	Stop             interface{} `json:"stop,omitempty"` // string or []string
+	FrequencyPenalty *float64    `json:"frequency_penalty,omitempty"`
+	PresencePenalty  *float64    `json:"presence_penalty,omitempty"`
+	Seed             *int        `json:"seed,omitempty"`
+	ParallelToolCalls *bool      `json:"parallel_tool_calls,omitempty"`
+	ToolStream       bool        `json:"tool_stream,omitempty"`
+}
+
+// ToRequestParams extracts pass-through parameters from ChatRequest
+func (r *ChatRequest) ToRequestParams() RequestParams {
+	return RequestParams{
+		Temperature:      r.Temperature,
+		TopP:             r.TopP,
+		MaxTokens:        r.MaxTokens,
+		FrequencyPenalty: r.FrequencyPenalty,
+		PresencePenalty:  r.PresencePenalty,
+		Seed:             r.Seed,
+		ToolStream:       r.ToolStream,
+	}
 }
 
 type ChatCompletionChunk struct {
@@ -156,6 +189,7 @@ type ChatCompletionChunk struct {
 	Created int64    `json:"created"`
 	Model   string   `json:"model"`
 	Choices []Choice `json:"choices"`
+	Usage   *Usage   `json:"usage,omitempty"`
 }
 
 type Choice struct {
@@ -178,12 +212,24 @@ type MessageResp struct {
 	ToolCalls        []ToolCall `json:"tool_calls,omitempty"`
 }
 
+type Usage struct {
+	PromptTokens     int              `json:"prompt_tokens"`
+	CompletionTokens int              `json:"completion_tokens"`
+	TotalTokens      int              `json:"total_tokens"`
+	PromptTokensDetails *PromptTokensDetails `json:"prompt_tokens_details,omitempty"`
+}
+
+type PromptTokensDetails struct {
+	CachedTokens int `json:"cached_tokens,omitempty"`
+}
+
 type ChatCompletionResponse struct {
-	ID      string   `json:"id"`
-	Object  string   `json:"object"`
-	Created int64    `json:"created"`
-	Model   string   `json:"model"`
-	Choices []Choice `json:"choices"`
+	ID        string   `json:"id"`
+	Object    string   `json:"object"`
+	Created   int64    `json:"created"`
+	Model     string   `json:"model"`
+	Choices   []Choice `json:"choices"`
+	Usage     Usage    `json:"usage"`
 }
 
 type ModelsResponse struct {

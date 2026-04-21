@@ -51,9 +51,10 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 
 	effectiveTools := toolset.ResolveEffectiveTools(req.Model, req.Tools)
 	completionID := fmt.Sprintf("chatcmpl-%s", uuid.New().String()[:29])
+	reqParams := req.ToRequestParams()
 
 	if !req.Stream {
-		turn, modelName, err := runAutoToolLoop(token, req.Messages, req.Model, effectiveTools.Tools, req.ToolChoice, effectiveTools.InjectedBuiltinNames, "call_")
+		turn, modelName, err := runAutoToolLoop(token, req.Messages, req.Model, effectiveTools.Tools, req.ToolChoice, effectiveTools.InjectedBuiltinNames, "call_", reqParams)
 		if err != nil {
 			handleChatUpstreamError(w, err)
 			return
@@ -63,7 +64,7 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if effectiveTools.HasInjectedBuiltins() {
-		turn, modelName, err := runAutoToolLoop(token, req.Messages, req.Model, effectiveTools.Tools, req.ToolChoice, effectiveTools.InjectedBuiltinNames, "call_")
+		turn, modelName, err := runAutoToolLoop(token, req.Messages, req.Model, effectiveTools.Tools, req.ToolChoice, effectiveTools.InjectedBuiltinNames, "call_", reqParams)
 		if err != nil {
 			handleChatUpstreamError(w, err)
 			return
@@ -72,7 +73,7 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, modelName, err := makeUpstreamRequest(token, req.Messages, req.Model, effectiveTools.Tools, req.ToolChoice)
+	resp, modelName, err := makeUpstreamRequest(token, req.Messages, req.Model, effectiveTools.Tools, req.ToolChoice, reqParams)
 	if err != nil {
 		logger.LogError("Upstream request failed: %v", err)
 		http.Error(w, "Upstream error", http.StatusBadGateway)
@@ -613,6 +614,7 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 			Delta:        &model.Delta{},
 			FinishReason: &stopReason,
 		}},
+		Usage: &model.Usage{},
 	}
 
 	data, _ := json.Marshal(finalChunk)
@@ -802,6 +804,7 @@ func handleNonStreamResponse(w http.ResponseWriter, body io.ReadCloser, completi
 			},
 			FinishReason: &stopReason,
 		}},
+		Usage: model.Usage{},
 	}
 
 	w.Header().Set("Content-Type", "application/json")

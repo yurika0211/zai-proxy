@@ -15,7 +15,7 @@ func TestRunAutoToolLoopExecutesInjectedBuiltin(t *testing.T) {
 
 	callCount := 0
 	var secondRequestMessages []model.Message
-	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}) (*http.Response, string, error) {
+	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}, reqParams model.RequestParams) (*http.Response, string, error) {
 		callCount++
 		switch callCount {
 		case 1:
@@ -43,14 +43,8 @@ func TestRunAutoToolLoopExecutesInjectedBuiltin(t *testing.T) {
 
 	effectiveTools := toolset.ResolveEffectiveTools("GLM-4.7-tools", nil)
 	turn, modelName, err := runAutoToolLoop(
-		"token",
-		[]model.Message{{Role: "user", Content: "现在几点"}},
-		"GLM-4.7-tools",
-		effectiveTools.Tools,
-		nil,
-		effectiveTools.InjectedBuiltinNames,
-		"call_",
-	)
+		"token", []model.Message{{Role: "user", Content: "现在几点"}}, "GLM-4.7-tools", effectiveTools.Tools, nil, effectiveTools.InjectedBuiltinNames,
+		"call_", model.RequestParams{})
 	if err != nil {
 		t.Fatalf("runAutoToolLoop error: %v", err)
 	}
@@ -94,7 +88,7 @@ func TestRunAutoToolLoopLeavesUnknownToolCallsForClient(t *testing.T) {
 	defer func() { makeUpstreamRequest = oldMakeUpstreamRequest }()
 
 	callCount := 0
-	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}) (*http.Response, string, error) {
+	makeUpstreamRequest = func(token string, messages []model.Message, modelName string, tools []model.Tool, toolChoice interface{}, reqParams model.RequestParams) (*http.Response, string, error) {
 		callCount++
 		return &http.Response{
 			StatusCode: http.StatusOK,
@@ -107,14 +101,8 @@ func TestRunAutoToolLoopLeavesUnknownToolCallsForClient(t *testing.T) {
 
 	effectiveTools := toolset.ResolveEffectiveTools("GLM-4.7-tools", nil)
 	turn, _, err := runAutoToolLoop(
-		"token",
-		[]model.Message{{Role: "user", Content: "天气如何"}},
-		"GLM-4.7-tools",
-		effectiveTools.Tools,
-		nil,
-		effectiveTools.InjectedBuiltinNames,
-		"call_",
-	)
+		"token", []model.Message{{Role: "user", Content: "天气如何"}}, "GLM-4.7-tools", effectiveTools.Tools, nil, effectiveTools.InjectedBuiltinNames,
+		"call_", model.RequestParams{})
 	if err != nil {
 		t.Fatalf("runAutoToolLoop error: %v", err)
 	}

@@ -206,12 +206,12 @@ func assignToolCallMetadata(toolCalls []model.ToolCall, idPrefix string) {
 	}
 }
 
-func runAutoToolLoop(token string, messages []model.Message, requestModel string, effectiveTools []model.Tool, toolChoice interface{}, autoBuiltinNames map[string]struct{}, idPrefix string) (assistantTurn, string, error) {
+func runAutoToolLoop(token string, messages []model.Message, requestModel string, effectiveTools []model.Tool, toolChoice interface{}, autoBuiltinNames map[string]struct{}, idPrefix string, reqParams model.RequestParams) (assistantTurn, string, error) {
 	currentMessages := append([]model.Message(nil), messages...)
 	lastModelName := ""
 
 	for round := 0; round <= maxAutomaticBuiltinToolRounds; round++ {
-		resp, modelName, err := makeUpstreamRequest(token, currentMessages, requestModel, effectiveTools, toolChoice)
+		resp, modelName, err := makeUpstreamRequest(token, currentMessages, requestModel, effectiveTools, toolChoice, reqParams)
 		if err != nil {
 			return assistantTurn{}, modelName, err
 		}
@@ -295,6 +295,7 @@ func writeOpenAINonStreamTurn(w http.ResponseWriter, completionID, modelName str
 			},
 			FinishReason: &stopReason,
 		}},
+		Usage: model.Usage{},
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -366,6 +367,7 @@ func writeOpenAIStreamTurn(w http.ResponseWriter, completionID, modelName string
 			Delta:        &model.Delta{},
 			FinishReason: &stopReason,
 		}},
+		Usage: &model.Usage{},
 	}
 
 	data, _ := json.Marshal(finalChunk)

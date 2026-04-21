@@ -56,11 +56,33 @@ func BuildToolSystemPrompt(tools []model.Tool, toolChoice interface{}) string {
 				sb.WriteString("**禁止调用任何工具，直接回答问题。**\n")
 			case "required":
 				sb.WriteString("**你的回复中必须包含至少一个 <tool_call> 标签。即使你认为不需要调用工具，也必须调用。**\n")
+			case "auto":
+				// default behavior, no additional instruction needed
 			}
 		case map[string]interface{}:
-			if fn, ok := tc["function"].(map[string]interface{}); ok {
-				if name, ok := fn["name"].(string); ok {
+			tcType, _ := tc["type"].(string)
+			switch tcType {
+			case "none":
+				sb.WriteString("**禁止调用任何工具，直接回答问题。**\n")
+			case "required":
+				sb.WriteString("**你的回复中必须包含至少一个 <tool_call> 标签。即使你认为不需要调用工具，也必须调用。**\n")
+			case "auto":
+				// default behavior
+			case "function":
+				// OpenAI format: {"type": "function", "function": {"name": "xxx"}}
+				if fn, ok := tc["function"].(map[string]interface{}); ok {
+					if name, ok := fn["name"].(string); ok {
+						sb.WriteString(fmt.Sprintf("**你必须调用工具 \"%s\"，且只能调用该工具。无论用户说什么，你的回复中必须包含 <tool_call> 标签调用该工具。**\n", name))
+					}
+				}
+			default:
+				// Anthropic format: {"type": "tool", "name": "xxx"} or fallback
+				if name, ok := tc["name"].(string); ok {
 					sb.WriteString(fmt.Sprintf("**你必须调用工具 \"%s\"，且只能调用该工具。无论用户说什么，你的回复中必须包含 <tool_call> 标签调用该工具。**\n", name))
+				} else if fn, ok := tc["function"].(map[string]interface{}); ok {
+					if name, ok := fn["name"].(string); ok {
+						sb.WriteString(fmt.Sprintf("**你必须调用工具 \"%s\"，且只能调用该工具。无论用户说什么，你的回复中必须包含 <tool_call> 标签调用该工具。**\n", name))
+					}
 				}
 			}
 		}

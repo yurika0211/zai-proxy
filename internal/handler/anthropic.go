@@ -59,9 +59,10 @@ func HandleMessages(w http.ResponseWriter, r *http.Request) {
 	resolvedModel, _ := model.ResolveClaudeModel(req.Model, thinkingEnabled)
 	effectiveTools := toolset.ResolveEffectiveTools(resolvedModel, tools)
 	messageID := fmt.Sprintf("msg_%s", uuid.New().String()[:24])
+	reqParams := model.RequestParams{} // Anthropic pass-through not yet implemented
 
 	if !req.Stream {
-		turn, modelName, err := runAutoToolLoop(token, messages, resolvedModel, effectiveTools.Tools, toolChoice, effectiveTools.InjectedBuiltinNames, "toolu_")
+		turn, modelName, err := runAutoToolLoop(token, messages, resolvedModel, effectiveTools.Tools, toolChoice, effectiveTools.InjectedBuiltinNames, "toolu_", reqParams)
 		if err != nil {
 			handleAnthropicUpstreamError(w, err)
 			return
@@ -72,7 +73,7 @@ func HandleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if effectiveTools.HasInjectedBuiltins() {
-		turn, _, err := runAutoToolLoop(token, messages, resolvedModel, effectiveTools.Tools, toolChoice, effectiveTools.InjectedBuiltinNames, "toolu_")
+		turn, _, err := runAutoToolLoop(token, messages, resolvedModel, effectiveTools.Tools, toolChoice, effectiveTools.InjectedBuiltinNames, "toolu_", reqParams)
 		if err != nil {
 			handleAnthropicUpstreamError(w, err)
 			return
@@ -81,7 +82,7 @@ func HandleMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, modelName, err := makeUpstreamRequest(token, messages, resolvedModel, effectiveTools.Tools, toolChoice)
+	resp, modelName, err := makeUpstreamRequest(token, messages, resolvedModel, effectiveTools.Tools, toolChoice, reqParams)
 	if err != nil {
 		logger.LogError("Upstream request failed: %v", err)
 		writeAnthropicError(w, http.StatusBadGateway, "api_error", "Upstream error")

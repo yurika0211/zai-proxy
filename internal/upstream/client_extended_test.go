@@ -53,7 +53,7 @@ func TestMakeUpstreamRequest_ValidToken_WithMockServer(t *testing.T) {
 
 	// Note: This will still fail because MakeUpstreamRequest makes real HTTP calls
 	// to https://chat.z.ai, not to our mock server. This test documents the limitation.
-	resp, chatID, err := MakeUpstreamRequest(token, messages, "glm-4", nil, nil)
+	resp, chatID, err := MakeUpstreamRequest(token, messages, "glm-4", nil, nil, model.RequestParams{})
 
 	// We expect an error because the real z.ai endpoint is not mocked
 	if err == nil && resp != nil {
@@ -72,7 +72,7 @@ func TestMakeUpstreamRequest_ValidToken_SimpleMessages(t *testing.T) {
 
 	// This will attempt to make a real HTTP request to z.ai
 	// In a real test environment, this would be mocked or skipped
-	resp, chatID, err := MakeUpstreamRequest(token, messages, "glm-4", nil, nil)
+	resp, chatID, err := MakeUpstreamRequest(token, messages, "glm-4", nil, nil, model.RequestParams{})
 
 	// Just verify the function doesn't panic and handles the response appropriately
 	if resp != nil {
@@ -107,7 +107,7 @@ func TestMakeUpstreamRequest_WithTools(t *testing.T) {
 		},
 	}
 
-	resp, chatID, err := MakeUpstreamRequest(token, messages, "glm-4", tools, "auto")
+	resp, chatID, err := MakeUpstreamRequest(token, messages, "glm-4", tools, "auto", model.RequestParams{})
 
 	if resp != nil {
 		defer resp.Body.Close()
@@ -125,7 +125,7 @@ func TestMakeUpstreamRequest_WithThinkingModel(t *testing.T) {
 		{Role: "user", Content: "Think about this"},
 	}
 
-	resp, chatID, err := MakeUpstreamRequest(token, messages, "glm-4-thinking", nil, nil)
+	resp, chatID, err := MakeUpstreamRequest(token, messages, "glm-4-thinking", nil, nil, model.RequestParams{})
 
 	if resp != nil {
 		defer resp.Body.Close()
@@ -143,7 +143,7 @@ func TestMakeUpstreamRequest_WithSearchModel(t *testing.T) {
 		{Role: "user", Content: "Search for information"},
 	}
 
-	resp, chatID, err := MakeUpstreamRequest(token, messages, "glm-4-web", nil, nil)
+	resp, chatID, err := MakeUpstreamRequest(token, messages, "glm-4-web", nil, nil, model.RequestParams{})
 
 	if resp != nil {
 		defer resp.Body.Close()

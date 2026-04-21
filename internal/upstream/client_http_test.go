@@ -15,7 +15,7 @@ func TestMakeUpstreamRequest_InvalidToken(t *testing.T) {
 		{Role: "user", Content: "Hello"},
 	}
 
-	resp, chatID, err := MakeUpstreamRequest("invalid-token", messages, "glm-4", nil, nil)
+	resp, chatID, err := MakeUpstreamRequest("invalid-token", messages, "glm-4", nil, nil, model.RequestParams{})
 
 	if err == nil {
 		t.Error("expected error for invalid token")
@@ -34,7 +34,7 @@ func TestMakeUpstreamRequest_EmptyToken(t *testing.T) {
 		{Role: "user", Content: "Hello"},
 	}
 
-	resp, chatID, err := MakeUpstreamRequest("", messages, "glm-4", nil, nil)
+	resp, chatID, err := MakeUpstreamRequest("", messages, "glm-4", nil, nil, model.RequestParams{})
 
 	if err == nil {
 		t.Error("expected error for empty token")
@@ -54,7 +54,7 @@ func TestMakeUpstreamRequest_MalformedToken(t *testing.T) {
 	}
 
 	// Token with wrong format
-	resp, chatID, err := MakeUpstreamRequest("not.a.valid.jwt", messages, "glm-4", nil, nil)
+	resp, chatID, err := MakeUpstreamRequest("not.a.valid.jwt", messages, "glm-4", nil, nil, model.RequestParams{})
 
 	if err == nil {
 		t.Error("expected error for malformed token")
@@ -180,7 +180,7 @@ func TestUploadImages_WithEmptyURLs(t *testing.T) {
 
 // TestMakeUpstreamRequest_NilMessages tests with nil messages
 func TestMakeUpstreamRequest_NilMessages(t *testing.T) {
-	resp, chatID, err := MakeUpstreamRequest("test-token", nil, "glm-4", nil, nil)
+	resp, chatID, err := MakeUpstreamRequest("test-token", nil, "glm-4", nil, nil, model.RequestParams{})
 
 	if err == nil {
 		t.Error("expected error for nil messages")
@@ -195,7 +195,7 @@ func TestMakeUpstreamRequest_NilMessages(t *testing.T) {
 
 // TestMakeUpstreamRequest_EmptyMessages tests with empty messages slice
 func TestMakeUpstreamRequest_EmptyMessages(t *testing.T) {
-	resp, chatID, err := MakeUpstreamRequest("test-token", []model.Message{}, "glm-4", nil, nil)
+	resp, chatID, err := MakeUpstreamRequest("test-token", []model.Message{}, "glm-4", nil, nil, model.RequestParams{})
 
 	if err == nil {
 		t.Error("expected error for empty messages")
