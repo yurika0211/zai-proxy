@@ -43,6 +43,9 @@ type UpstreamFile struct {
 	Media  string             `json:"media"`
 }
 
+// uploadBaseURL allows overriding the upload endpoint for testing
+var uploadBaseURL = "https://chat.z.ai"
+
 // UploadImageFromURL 从 URL 或 base64 上传图片到 z.ai
 func UploadImageFromURL(token string, imageURL string) (*UpstreamFile, error) {
 	var imageData []byte
@@ -134,7 +137,7 @@ func UploadImageFromURL(token string, imageURL string) (*UpstreamFile, error) {
 	writer.Close()
 
 	// 发送上传请求
-	req, err := http.NewRequest("POST", "https://chat.z.ai/api/v1/files/", &buf)
+	req, err := http.NewRequest("POST", uploadBaseURL+"/api/v1/files/", &buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create upload request: %v", err)
 	}
