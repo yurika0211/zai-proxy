@@ -141,3 +141,43 @@ func TestHandleStats_MethodNotAllowed(t *testing.T) {
 		t.Errorf("expected 405, got %d", w.Code)
 	}
 }
+
+// ===== HandleHealth =====
+
+func TestHandleHealth_OK(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/health", nil)
+	HandleHealth(w, r)
+
+	if w.Code != 200 {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+
+	var result map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal health response: %v", err)
+	}
+	if result["status"] != "ok" {
+		t.Errorf("expected status ok, got %v", result["status"])
+	}
+}
+
+func TestHandleHealth_MethodNotAllowed(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/health", nil)
+	HandleHealth(w, r)
+
+	if w.Code != 405 {
+		t.Errorf("expected 405, got %d", w.Code)
+	}
+}
+
+func TestHandleHealth_HeadAllowed(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("HEAD", "/health", nil)
+	HandleHealth(w, r)
+
+	if w.Code != 200 {
+		t.Errorf("expected 200 for HEAD, got %d", w.Code)
+	}
+}

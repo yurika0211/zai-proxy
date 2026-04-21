@@ -5,6 +5,7 @@ import "net/http"
 func NewRouter() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", HandleIndex)
+	mux.HandleFunc("/health", HandleHealth)
 	mux.HandleFunc("/healthz", HandleHealthz)
 	mux.HandleFunc("/stats", HandleStats)
 	mux.HandleFunc("/v1/models", HandleModels)

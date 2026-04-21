@@ -141,6 +141,16 @@ func HandleHealthz(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// HandleHealth returns a simple health check response always available
+// (does not require EnableStatusPage). Suitable for load balancer probes.
+func HandleHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
 func HandleStats(w http.ResponseWriter, r *http.Request) {
 	cfg := config.GetConfig()
 	if !cfg.EnableStatusPage {
