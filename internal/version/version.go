@@ -13,7 +13,13 @@ import (
 var (
 	feVersion   string
 	versionLock sync.RWMutex
+	httpClient  = &http.Client{Timeout: 10 * time.Second}
 )
+
+// SetHTTPClient allows tests to inject a mock HTTP client
+func SetHTTPClient(client *http.Client) {
+	httpClient = client
+}
 
 func GetFeVersion() string {
 	versionLock.RLock()
@@ -22,7 +28,7 @@ func GetFeVersion() string {
 }
 
 func fetchFeVersion() {
-	resp, err := http.Get("https://chat.z.ai/")
+	resp, err := httpClient.Get("https://chat.z.ai/")
 	if err != nil {
 		logger.LogError("Failed to fetch fe version: %v", err)
 		return
