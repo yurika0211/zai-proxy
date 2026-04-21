@@ -1,0 +1,52 @@
+# zai-proxy service-layer config
+#
+# If this file is absent, the server still starts with defaults and env vars.
+# You can run:
+#   go run . -config config.yaml
+
+listen: ":8000"
+log-level: "info"
+
+enable-cors: true
+allowed-origins:
+  - "*"
+
+enable-status-page: true
+
+read-header-timeout-sec: 10
+read-timeout-sec: 0
+write-timeout-sec: 0
+idle-timeout-sec: 120
+shutdown-timeout-sec: 10
+
+# Controlled builtin command execution for `GLM-4.7-tools`.
+enable-exec-command: true
+exec-command-working-dir: "."
+exec-command-timeout-sec: 20
+exec-command-max-output-bytes: 65536
+exec-command-allow-background: true
+exec-command-allowlist:
+  - "pwd"
+  - "ls"
+  - "cat"
+  - "head"
+  - "tail"
+  - "sed"
+  - "grep"
+  - "rg"
+  - "find"
+  - "wc"
+  - "stat"
+  - "git status"
+  - "git diff"
+  - "git log"
+  - "git show"
+  - "go test"
+  - "go run"
+  - "go env"
+  - "npm run"
+  - "npm test"
+  - "pnpm run"
+  - "pnpm test"
+  - "yarn run"
+  - "yarn test"

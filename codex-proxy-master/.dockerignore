@@ -1,0 +1,8 @@
+auths/
+config.yaml
+CLIProxyAPIPlus/
+*.exe
+.git/
+.github/
+.idea/
+.vscode/
