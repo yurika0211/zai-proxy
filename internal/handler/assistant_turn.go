@@ -218,9 +218,14 @@ func runAutoToolLoop(token string, messages []model.Message, requestModel string
 		lastModelName = modelName
 
 		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
+			body, readErr := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			bodyStr := string(body)
+			bodyStr := ""
+			if readErr != nil {
+				logger.LogError("Failed to read upstream error body: %v", readErr)
+			} else {
+				bodyStr = string(body)
+			}
 			if len(bodyStr) > 500 {
 				bodyStr = bodyStr[:500]
 			}

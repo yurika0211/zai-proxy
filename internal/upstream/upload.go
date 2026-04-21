@@ -152,8 +152,14 @@ func UploadImageFromURL(token string, imageURL string) (*UpstreamFile, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("upload failed: status %d, body: %s", resp.StatusCode, string(body))
+		body, readErr := io.ReadAll(resp.Body)
+		bodyStr := ""
+		if readErr != nil {
+			bodyStr = fmt.Sprintf("(read error: %v)", readErr)
+		} else {
+			bodyStr = string(body)
+		}
+		return nil, fmt.Errorf("upload failed: status %d, body: %s", resp.StatusCode, bodyStr)
 	}
 
 	var uploadResp FileUploadResponse

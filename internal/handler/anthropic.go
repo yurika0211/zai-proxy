@@ -91,8 +91,13 @@ func HandleMessages(w http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		bodyStr := string(body)
+		body, err := io.ReadAll(resp.Body)
+		bodyStr := ""
+		if err != nil {
+			logger.LogError("Failed to read upstream error body: %v", err)
+		} else {
+			bodyStr = string(body)
+		}
 		if len(bodyStr) > 500 {
 			bodyStr = bodyStr[:500]
 		}

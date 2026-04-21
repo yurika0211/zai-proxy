@@ -82,8 +82,13 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		bodyStr := string(body)
+		body, err := io.ReadAll(resp.Body)
+		bodyStr := ""
+		if err != nil {
+			logger.LogError("Failed to read upstream error body: %v", err)
+		} else {
+			bodyStr = string(body)
+		}
 		if len(bodyStr) > 500 {
 			bodyStr = bodyStr[:500]
 		}
@@ -135,7 +140,7 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 		logger.LogDebug("[Upstream] %s", line)
 
 		if !strings.HasPrefix(line, "data: ") {
-			logger.LogInfo("[DEBUG-Stream] non-data line: %s", truncate(line, 200))
+			logger.LogDebug("[DEBUG-Stream] non-data line: %s", truncate(line, 200))
 			continue
 		}
 
@@ -146,11 +151,11 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 
 		var upstreamData model.UpstreamData
 		if err := json.Unmarshal([]byte(payload), &upstreamData); err != nil {
-			logger.LogInfo("[DEBUG-Stream] JSON parse error: %v, payload=%s", err, truncate(payload, 300))
+			logger.LogDebug("[DEBUG-Stream] JSON parse error: %v, payload=%s", err, truncate(payload, 300))
 			continue
 		}
 
-		logger.LogInfo("[DEBUG-Stream] phase=%s delta_content_len=%d edit_content_len=%d", upstreamData.Data.Phase, len(upstreamData.Data.DeltaContent), len(upstreamData.Data.EditContent))
+		logger.LogDebug("[DEBUG-Stream] phase=%s delta_content_len=%d edit_content_len=%d", upstreamData.Data.Phase, len(upstreamData.Data.DeltaContent), len(upstreamData.Data.EditContent))
 
 		if upstreamData.Data.Phase == "done" {
 			break
@@ -188,8 +193,8 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 							FinishReason: nil,
 						}},
 					}
-					data, _ := json.Marshal(chunk)
-					fmt.Fprintf(w, "data: %s\n\n", data)
+					data := marshalChunk(chunk)
+					if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 					flusher.Flush()
 				}
 			}
@@ -225,8 +230,8 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 							FinishReason: nil,
 						}},
 					}
-					data, _ := json.Marshal(chunk)
-					fmt.Fprintf(w, "data: %s\n\n", data)
+					data := marshalChunk(chunk)
+					if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 					flusher.Flush()
 				}
 			}
@@ -252,8 +257,8 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 							FinishReason: nil,
 						}},
 					}
-					data, _ := json.Marshal(chunk)
-					fmt.Fprintf(w, "data: %s\n\n", data)
+					data := marshalChunk(chunk)
+					if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 					flusher.Flush()
 				}
 			}
@@ -292,8 +297,8 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 							FinishReason: nil,
 						}},
 					}
-					data, _ := json.Marshal(chunk)
-					fmt.Fprintf(w, "data: %s\n\n", data)
+					data := marshalChunk(chunk)
+					if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 					flusher.Flush()
 				}
 			}
@@ -313,8 +318,8 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 					FinishReason: nil,
 				}},
 			}
-			data, _ := json.Marshal(chunk)
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			data := marshalChunk(chunk)
+			if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 			flusher.Flush()
 			pendingSourcesMarkdown = ""
 		}
@@ -331,8 +336,8 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 					FinishReason: nil,
 				}},
 			}
-			data, _ := json.Marshal(chunk)
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			data := marshalChunk(chunk)
+			if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 			flusher.Flush()
 			pendingImageSearchMarkdown = ""
 		}
@@ -356,8 +361,8 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 						FinishReason: nil,
 					}},
 				}
-				data, _ := json.Marshal(chunk)
-				fmt.Fprintf(w, "data: %s\n\n", data)
+				data := marshalChunk(chunk)
+				if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 				flusher.Flush()
 			}
 		}
@@ -375,8 +380,8 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 					FinishReason: nil,
 				}},
 			}
-			data, _ := json.Marshal(chunk)
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			data := marshalChunk(chunk)
+			if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 			flusher.Flush()
 			pendingSourcesMarkdown = ""
 		}
@@ -425,8 +430,8 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 					FinishReason: nil,
 				}},
 			}
-			data, _ := json.Marshal(chunk)
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			data := marshalChunk(chunk)
+			if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 			flusher.Flush()
 		}
 
@@ -515,8 +520,8 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 								FinishReason: nil,
 							}},
 						}
-						data, _ := json.Marshal(chunk)
-						fmt.Fprintf(w, "data: %s\n\n", data)
+						data := marshalChunk(chunk)
+						if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 						flusher.Flush()
 					}
 				}
@@ -536,8 +541,8 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 			}},
 		}
 
-		data, _ := json.Marshal(chunk)
-		fmt.Fprintf(w, "data: %s\n\n", data)
+		data := marshalChunk(chunk)
+		if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 		flusher.Flush()
 	}
 
@@ -566,8 +571,8 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 						FinishReason: nil,
 					}},
 				}
-				data, _ := json.Marshal(chunk)
-				fmt.Fprintf(w, "data: %s\n\n", data)
+				data := marshalChunk(chunk)
+				if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 				flusher.Flush()
 			}
 		}
@@ -591,8 +596,8 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 				FinishReason: nil,
 			}},
 		}
-		data, _ := json.Marshal(chunk)
-		fmt.Fprintf(w, "data: %s\n\n", data)
+		data := marshalChunk(chunk)
+		if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 		flusher.Flush()
 	}
 
@@ -618,7 +623,7 @@ func handleStreamResponse(w http.ResponseWriter, body io.ReadCloser, completionI
 	}
 
 	data, _ := json.Marshal(finalChunk)
-	fmt.Fprintf(w, "data: %s\n\n", data)
+	if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 	fmt.Fprintf(w, "data: [DONE]\n\n")
 	flusher.Flush()
 }
@@ -648,11 +653,11 @@ func handleNonStreamResponse(w http.ResponseWriter, body io.ReadCloser, completi
 
 		var upstreamData model.UpstreamData
 		if err := json.Unmarshal([]byte(payload), &upstreamData); err != nil {
-			logger.LogInfo("[DEBUG-NonStream] JSON parse error: %v, payload=%s", err, truncate(payload, 200))
+			logger.LogDebug("[DEBUG-NonStream] JSON parse error: %v, payload=%s", err, truncate(payload, 200))
 			continue
 		}
 
-		logger.LogInfo("[DEBUG-NonStream] phase=%s delta_content_len=%d edit_content_len=%d", upstreamData.Data.Phase, len(upstreamData.Data.DeltaContent), len(upstreamData.Data.EditContent))
+		logger.LogDebug("[DEBUG-NonStream] phase=%s delta_content_len=%d edit_content_len=%d", upstreamData.Data.Phase, len(upstreamData.Data.DeltaContent), len(upstreamData.Data.EditContent))
 
 		if upstreamData.Data.Phase == "done" {
 			break
@@ -824,8 +829,8 @@ func sendContentChunk(w http.ResponseWriter, flusher http.Flusher, completionID,
 			FinishReason: nil,
 		}},
 	}
-	data, _ := json.Marshal(chunk)
-	fmt.Fprintf(w, "data: %s\n\n", data)
+	data := marshalChunk(chunk)
+	if data != nil { fmt.Fprintf(w, "data: %s\n\n", data) }
 	flusher.Flush()
 }
 
@@ -834,4 +839,14 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// marshalChunk safely marshals a chunk to JSON, logging errors instead of silently ignoring them
+func marshalChunk(v interface{}) []byte {
+	data, err := json.Marshal(v)
+	if err != nil {
+		logger.LogError("Failed to marshal stream chunk: %v", err)
+		return nil
+	}
+	return data
 }
