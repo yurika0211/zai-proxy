@@ -9,7 +9,8 @@ import (
 
 func withOptionsBypass(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !config.Cfg.EnableCORS || r.Method != http.MethodOptions {
+		cfg := config.GetConfig()
+		if !cfg.EnableCORS || r.Method != http.MethodOptions {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -27,7 +28,8 @@ func withOptionsBypass(next http.Handler) http.Handler {
 
 func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if config.Cfg.EnableCORS {
+		cfg := config.GetConfig()
+		if cfg.EnableCORS {
 			if origin, allowed := resolveAllowedOrigin(r.Header.Get("Origin")); allowed {
 				applyCORSHeaders(w, r, origin)
 			}
@@ -58,7 +60,8 @@ func applyCORSHeaders(w http.ResponseWriter, r *http.Request, origin string) {
 }
 
 func resolveAllowedOrigin(requestOrigin string) (string, bool) {
-	origins := config.Cfg.AllowedOrigins
+	cfg := config.GetConfig()
+	origins := cfg.AllowedOrigins
 	if len(origins) == 0 {
 		return "", false
 	}

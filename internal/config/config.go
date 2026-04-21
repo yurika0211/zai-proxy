@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
@@ -40,7 +41,17 @@ type ExecCommandSettings struct {
 	AllowBackground bool
 }
 
-var Cfg *Config
+var (
+	cfgMu sync.RWMutex
+	Cfg   *Config
+)
+
+// GetConfig returns the current config under read lock.
+func GetConfig() *Config {
+	cfgMu.RLock()
+	defer cfgMu.RUnlock()
+	return Cfg
+}
 
 func LoadConfig(path string) error {
 	_ = godotenv.Load()
@@ -58,17 +69,31 @@ func LoadConfig(path string) error {
 		return err
 	}
 
+	cfgMu.Lock()
 	Cfg = cfg
+	cfgMu.Unlock()
 	return nil
 }
 
+// SetConfigForTest replaces the global config under write lock.
+// Only for use in tests.
+func SetConfigForTest(cfg *Config) {
+	cfgMu.Lock()
+	defer cfgMu.Unlock()
+	Cfg = cfg
+}
+
 func CurrentExecCommandSettings() ExecCommandSettings {
-	if Cfg == nil {
+	cfgMu.RLock()
+	c := Cfg
+	cfgMu.RUnlock()
+
+	if c == nil {
 		cfg := defaultConfig()
 		cfg.Sanitize()
 		return cfg.execCommandSettings()
 	}
-	return Cfg.execCommandSettings()
+	return c.execCommandSettings()
 }
 
 func defaultConfig() *Config {

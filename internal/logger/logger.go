@@ -2,11 +2,15 @@ package logger
 
 import (
 	"fmt"
+	"io"
+	"log"
+	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
-type LogLevel int
+type LogLevel int32
 
 const (
 	DEBUG LogLevel = iota
@@ -16,8 +20,8 @@ const (
 )
 
 var (
-	currentLevel LogLevel = INFO
-	levelNames            = map[LogLevel]string{
+	currentLevel atomic.Int32
+	levelNames   = map[LogLevel]string{
 		DEBUG: "DEBUG",
 		INFO:  "INFO",
 		WARN:  "WARN",
@@ -30,43 +34,55 @@ var (
 		ERROR: "\033[31m",
 	}
 	resetColor = "\033[0m"
+	output     io.Writer = os.Stdout
 )
+
+func init() {
+	currentLevel.Store(int32(INFO))
+}
 
 func InitLogger(level string) {
 	level = strings.TrimSpace(level)
-	switch level {
-	case "debug", "DEBUG":
-		currentLevel = DEBUG
-	case "warn", "WARN":
-		currentLevel = WARN
-	case "error", "ERROR":
-		currentLevel = ERROR
+	switch strings.ToLower(level) {
+	case "debug":
+		currentLevel.Store(int32(DEBUG))
+	case "warn":
+		currentLevel.Store(int32(WARN))
+	case "error":
+		currentLevel.Store(int32(ERROR))
 	default:
-		currentLevel = INFO
+		currentLevel.Store(int32(INFO))
 	}
 }
 
-func log(level LogLevel, format string, v ...interface{}) {
-	if level < currentLevel {
+// SetOutput redirects log output; used in tests to suppress noise.
+func SetOutput(w io.Writer) {
+	output = w
+}
+
+func writeLog(level LogLevel, format string, v ...interface{}) {
+	if level < LogLevel(currentLevel.Load()) {
 		return
 	}
 	timestamp := time.Now().Format("2006/01/02 15:04:05")
 	msg := fmt.Sprintf(format, v...)
-	fmt.Printf("%s[%s]%s %s %s\n", levelColors[level], levelNames[level], resetColor, timestamp, msg)
+	// Use log.Printf to ensure thread-safe writes to output.
+	logger := log.New(output, "", 0)
+	logger.Printf("%s[%s]%s %s %s", levelColors[level], levelNames[level], resetColor, timestamp, msg)
 }
 
 func LogDebug(format string, v ...interface{}) {
-	log(DEBUG, format, v...)
+	writeLog(DEBUG, format, v...)
 }
 
 func LogInfo(format string, v ...interface{}) {
-	log(INFO, format, v...)
+	writeLog(INFO, format, v...)
 }
 
 func LogWarn(format string, v ...interface{}) {
-	log(WARN, format, v...)
+	writeLog(WARN, format, v...)
 }
 
 func LogError(format string, v ...interface{}) {
-	log(ERROR, format, v...)
+	writeLog(ERROR, format, v...)
 }

@@ -2,21 +2,16 @@ package logger
 
 import (
 	"bytes"
-	"io"
-	"os"
 	"strings"
 	"testing"
 )
 
 func captureOutput(f func()) string {
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	f()
-	w.Close()
-	os.Stdout = old
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	old := output
+	output = &buf
+	defer func() { output = old }()
+	f()
 	return buf.String()
 }
 
@@ -39,8 +34,9 @@ func TestInitLogger_Levels(t *testing.T) {
 
 	for _, tt := range tests {
 		InitLogger(tt.input)
-		if currentLevel != tt.expected {
-			t.Errorf("InitLogger(%q): expected %d, got %d", tt.input, tt.expected, currentLevel)
+		got := LogLevel(currentLevel.Load())
+		if got != tt.expected {
+			t.Errorf("InitLogger(%q): expected %d, got %d", tt.input, tt.expected, got)
 		}
 	}
 }
@@ -133,4 +129,19 @@ func TestLogLevelNames(t *testing.T) {
 	if !strings.Contains(output, "ERROR") {
 		t.Error("should contain ERROR level name")
 	}
+}
+
+func TestConcurrentLogging(t *testing.T) {
+	InitLogger("info")
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < 100; i++ {
+			LogInfo("goroutine 1: %d", i)
+		}
+		close(done)
+	}()
+	for i := 0; i < 100; i++ {
+		LogInfo("goroutine 2: %d", i)
+	}
+	<-done
 }

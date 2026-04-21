@@ -8,18 +8,22 @@ import (
 	"zai-proxy/internal/config"
 )
 
+// setTestConfig replaces the global config for the duration of the test.
+func setTestConfig(t *testing.T, cfg *config.Config) {
+	t.Helper()
+	cfg.Sanitize()
+	config.SetConfigForTest(cfg)
+}
+
 func TestExecuteBuiltinToolExecCommand_Success(t *testing.T) {
-	prev := config.Cfg
-	config.Cfg = &config.Config{
+	setTestConfig(t, &config.Config{
 		EnableExecCommand:          true,
 		ExecCommandAllowlist:       []string{"pwd"},
 		ExecCommandWorkingDir:      t.TempDir(),
 		ExecCommandTimeoutSec:      5,
 		ExecCommandMaxOutputBytes:  4096,
 		ExecCommandAllowBackground: false,
-	}
-	config.Cfg.Sanitize()
-	t.Cleanup(func() { config.Cfg = prev })
+	})
 
 	raw := ExecuteBuiltinTool("exec_command", `{"command":"pwd"}`)
 
@@ -51,17 +55,14 @@ func TestExecuteBuiltinToolExecCommand_Success(t *testing.T) {
 }
 
 func TestExecuteBuiltinToolExecCommand_DeniedByAllowlist(t *testing.T) {
-	prev := config.Cfg
-	config.Cfg = &config.Config{
+	setTestConfig(t, &config.Config{
 		EnableExecCommand:          true,
 		ExecCommandAllowlist:       []string{"pwd"},
 		ExecCommandWorkingDir:      t.TempDir(),
 		ExecCommandTimeoutSec:      5,
 		ExecCommandMaxOutputBytes:  4096,
 		ExecCommandAllowBackground: false,
-	}
-	config.Cfg.Sanitize()
-	t.Cleanup(func() { config.Cfg = prev })
+	})
 
 	raw := ExecuteBuiltinTool("exec_command", `{"command":"rm -rf ."}`)
 
@@ -84,17 +85,14 @@ func TestExecuteBuiltinToolExecCommand_DeniedByAllowlist(t *testing.T) {
 }
 
 func TestExecuteBuiltinToolExecCommand_RejectsShellSyntax(t *testing.T) {
-	prev := config.Cfg
-	config.Cfg = &config.Config{
+	setTestConfig(t, &config.Config{
 		EnableExecCommand:          true,
 		ExecCommandAllowlist:       []string{"pwd"},
 		ExecCommandWorkingDir:      t.TempDir(),
 		ExecCommandTimeoutSec:      5,
 		ExecCommandMaxOutputBytes:  4096,
 		ExecCommandAllowBackground: false,
-	}
-	config.Cfg.Sanitize()
-	t.Cleanup(func() { config.Cfg = prev })
+	})
 
 	raw := ExecuteBuiltinTool("exec_command", `{"command":"pwd && ls"}`)
 
