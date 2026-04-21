@@ -6,3 +6,4 @@ hello.txt
 psychoanalysis.txt
 docs/
 coverage.out
+*_cover.out
