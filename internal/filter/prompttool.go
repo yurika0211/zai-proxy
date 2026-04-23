@@ -17,6 +17,9 @@ var altToolCallPattern = regexp.MustCompile(`\[TOOL(?:_CALL)?\]\s*([\s\S]*?)\s*\
 // jsonBlockPattern 匹配 markdown JSON 代码块中的 tool call
 var jsonBlockPattern = regexp.MustCompile("```json\\s*\\n(\\{[\\s\\S]*?\"name\"[\\s\\S]*?\\})\\s*\\n```")
 
+// diamondToolCallPattern 匹配 ◇name◇args◇ 格式（prompt-injected tool calls）
+var diamondToolCallPattern = regexp.MustCompile(`◇([a-zA-Z0-9_]+)◇(.*?)◇`)
+
 // ExtractPromptToolCalls 从文本中提取所有 tool call 块（支持多种格式），
 // 返回清理后的文本和解析出的 tool calls。
 func ExtractPromptToolCalls(content string) (cleanContent string, toolCalls []model.ToolCall) {
@@ -43,6 +46,28 @@ func ExtractPromptToolCalls(content string) (cleanContent string, toolCalls []mo
 			if calls := parsePromptToolCallJSON(jsonStr); len(calls) > 0 {
 				allCalls = append(allCalls, calls...)
 			}
+			cleaned = cleaned[:fullStart] + cleaned[fullEnd:]
+		}
+	}
+
+	// 最后尝试 ◇name◇args◇ 格式（prompt-injected tool calls）
+	matches := diamondToolCallPattern.FindAllStringSubmatchIndex(cleaned, -1)
+	if len(matches) > 0 {
+		for i := len(matches) - 1; i >= 0; i-- {
+			match := matches[i]
+			fullStart, fullEnd := match[0], match[1]
+			nameStart, nameEnd := match[2], match[3]
+			argsStart, argsEnd := match[4], match[5]
+
+			name := cleaned[nameStart:nameEnd]
+			args := cleaned[argsStart:argsEnd]
+
+			allCalls = append(allCalls, model.ToolCall{
+				Function: model.FunctionCall{
+					Name:      name,
+					Arguments: args,
+				},
+			})
 			cleaned = cleaned[:fullStart] + cleaned[fullEnd:]
 		}
 	}
